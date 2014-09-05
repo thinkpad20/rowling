@@ -27,8 +27,28 @@ library
                      , Language.Rowling.TypeCheck.Builtins
                      , Language.Rowling.TypeCheck.TypeChecker
   -- other-modules:
-  other-extensions:    NoImplicitPrelude, OverloadedStrings, OverloadedLists, LambdaCase, TypeFamilies, FlexibleInstances, TypeSynonymInstances, RecordWildCards, FlexibleContexts, NoMonomorphismRestriction, BangPatterns, MultiParamTypeClasses, FunctionalDependencies
-  build-depends:       base >=4.7 && <4.8, containers >=0.5 && <0.6, unordered-containers, classy-prelude, parsec, mtl, context-stack, data-default, text
+  other-extensions:    NoImplicitPrelude
+                     , OverloadedStrings
+                     , OverloadedLists
+                     , LambdaCase
+                     , TypeFamilies
+                     , FlexibleInstances
+                     , TypeSynonymInstances
+                     , RecordWildCards
+                     , FlexibleContexts
+                     , NoMonomorphismRestriction
+                     , BangPatterns
+                     , MultiParamTypeClasses
+                     , FunctionalDependencies
+  build-depends:       base >=4.7 && <4.8
+                     , containers >=0.5 && <0.6
+                     , unordered-containers
+                     , classy-prelude
+                     , parsec
+                     , mtl
+                     , context-stack
+                     , data-default
+                     , text
   hs-source-dirs:      src
   default-language:    Haskell2010
 
@@ -40,4 +60,12 @@ Test-Suite spec
                       , test
 --  Ghc-Options:          -Wall
   Main-Is:              Spec.hs
-  Build-Depends:        base >=4.7 && <4.8, containers >=0.5 && <0.6, unordered-containers, classy-prelude, parsec, mtl, hspec, context-stack, data-default
+  Build-Depends:        base >=4.7 && <4.8
+                      , containers >=0.5 && <0.6
+                      , unordered-containers
+                      , classy-prelude
+                      , parsec
+                      , mtl
+                      , hspec
+                      , context-stack
+                      , data-default

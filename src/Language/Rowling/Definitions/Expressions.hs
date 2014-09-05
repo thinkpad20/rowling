@@ -14,7 +14,7 @@ import Language.Rowling.Definitions.Types
 -- | The expression type.
 data Expr = Int Integer -- ^ An integer literal.
           | Float Double -- ^ An floating-point literal.
-          | String Text -- ^ A string literal.
+          | String Interp -- ^ A string literal.
           | Bool Bool -- ^ A boolean literal.
           | Variable Name -- ^ A variable.
           | Typed Expr Type -- ^ An expression with annotated type.
@@ -29,6 +29,10 @@ data Expr = Int Integer -- ^ An integer literal.
 
 -- | Patterns are just expressions, although they're used differently.
 type Pattern = Expr
+
+data Interp = Plain Text
+            | Interp Interp Expr Interp
+            deriving (Show, Eq)
 
 instance IsString Expr where
   fromString = Variable . fromString
@@ -65,6 +69,24 @@ instance Render Expr where
     Lambda _ _ -> parens
     _ -> render e
     where parens = "(" <> render e <> ")"
+
+instance IsString Interp where
+  fromString = Plain . fromString
+
+instance Render Interp where
+  render interp = "\"" <> go interp <> "\"" where
+    go (Plain text) = text
+    go (Interp in1 expr in2) = go in1 <> "$(" <> render expr <> ")" <> go in2
+
+instance Monoid Interp where
+  mempty = Plain ""
+  mappend (Plain s1) (Plain s2) = Plain (s1 <> s2)
+  mappend interp (Interp in1 e in2) = Interp (mappend interp in1) e in2
+  mappend (Interp in1 e in2) interp = Interp in1 e (mappend in2 interp)
+
+
+instance Semigroup Interp where
+  (<>) = mappend
 
 -- | Characters legal in symbols.
 symChars :: P.String

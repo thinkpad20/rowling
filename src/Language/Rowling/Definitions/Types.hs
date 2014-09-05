@@ -10,8 +10,9 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.List as L
 import Data.String (IsString(..))
-import Language.Rowling.Common hiding (head, length)
 import Data.Traversable
+
+import Language.Rowling.Common hiding (head, length)
 
 data Type = TRecord (HashMap Name Type) (Maybe Name)
           | TConst Name
@@ -50,6 +51,32 @@ instance Render Type where
 instance Default Type where
   def = TRecord mempty Nothing
 
+-- | Checks if the type on the left is at least as general as the type on
+-- the right. For example, a type variable is at least as general as anything,
+-- a tuple with a variable in the `k`th position is at least as general as a
+-- tupe
+-- an (a, Foo) tuple (where Foo is constant) is at least as general as ()
+(>==) :: Type -> Type -> Bool
+TRecord fields1 r1 >== TRecord fields2 r2 =
+  fields1 `vs` fields2 && case (r1, r2) of
+    (Nothing, Nothing) -> True
+    (Just _, _) -> True
+    _ -> False
+  where
+    -- | Comparing the generality of two records.
+    rec1 `vs` rec2 = go $ H.toList rec1 where
+      go [] = True
+      go ((field, typ):rest) = case H.lookup field rec2 of
+        -- If the field doesn't exist in the second record, they're not
+        -- compatible.
+        Nothing -> False
+        -- Otherwise, they must be compatible.
+        Just typ' -> typ >== typ' && go rest
+TConst name1 >== TConst name2 = name1 == name2
+TVar _ >== _ = True
+TApply t1 t2 >== TApply t3 t4 = t1 >== t3 && t2 >== t4
+_ >== _ = False
+
 isNumber :: Text -> Bool
 isNumber = T.all isDigit
 
@@ -59,16 +86,6 @@ instance IsString Type where
     if length s' > 0 && (isLower (head s') || head s' == '$')
     then TVar s'
     else TConst s'
-
-instance FuzzyEquals Type where
-  TRecord fields1 r1 ~~ TRecord fields2 r2 =
-    fields1 ~~ fields2 && case (r1, r2) of
-      (Nothing, Nothing) -> True
-      (Just _, _) -> True
-      _ -> False
-  TConst name1 ~~ TConst name2 = name1 == name2
-  TVar _ ~~ _ = True
-  TApply t1 t2 ~~ TApply t3 t4 = t1 ~~ t3 && t2 ~~ t4
 
 -- | Class of things which contain free variables. @freevars@ gets all of the
 --  free variables out of a type. For example the type @a@ has free variables

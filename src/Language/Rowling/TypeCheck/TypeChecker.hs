@@ -178,7 +178,8 @@ typeOf expr = go expr `catchError` whenTyping where
     Bool _ -> only "Bool"
     String _ -> only "String"
     Variable name -> findOrError' name >>= instantiate >>= only where
-      findOrError' = findOrError $ EL ["No variable '", name, "' in scope"]
+      findOrError' = findOrError $
+        ErrorList ["No variable '", name, "' in scope"]
     Lambda param body -> withFrame mempty $ do
       (paramT, paramS) <- loadParam param
       (bodyT, bodyS) <- typeOf body
@@ -346,7 +347,7 @@ typeIt = typeIt' typeOf
 typeIt' :: (Expr -> TypeChecker a)
         -> P.String -> (Either ErrorList a, TCState)
 typeIt' typer input = case parseIt input of
-  Left err -> (Left $ EL [pack $ show err], def)
+  Left err -> (Left $ ErrorList [pack $ show err], def)
   Right expr -> runTypingWith def $ typer expr
 
 typeWith :: MonadError ErrorList m

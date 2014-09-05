@@ -2,6 +2,7 @@
 module Language.Rowling.Parser where
 
 import qualified Prelude as P
+import Data.Char (isAlpha)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Set as S
 import Prelude (String)
@@ -51,7 +52,11 @@ keyword = try . sstring
 
 -- | Parses an identifier starting with a lower-case letter or underscore.
 lowerIdent :: Parser Text
-lowerIdent = lexeme $ do
+lowerIdent = lexeme lowerIdent
+
+-- | Parses an identifier, but doesn't consume trailing whitespace.
+lowerIdent' :: Parser Text
+lowerIdent' = do
   first <- lower
   rest <- many $ letter <|> digit <|> char '_'
   return $ pack $ first : rest
@@ -96,9 +101,40 @@ symbol = lexeme $ try $ do
   if sym `member` keysymbols then unexpected $ "keysymbol " <> show sym
   else return sym
 
--- | Parses a string constant, with \-escaped characters.
-pString :: Parser Text
-pString = do
+-- | Parses a non-keyword lower-case-starting identifier.
+identifier :: Parser Text
+identifier = notKeyword lowerIdent
+
+-- | Parses anything that can be in a keypath, including digits.
+keyPathVar :: Parser Text
+keyPathVar = anyIdentifier <|> fmap render pInt
+
+-- | Parses any identifier (upper- or lower-case).
+anyIdentifier :: Parser Text
+anyIdentifier = upperIdent <|> lowerIdent
+
+-- | Parses an identifier and wraps in a `Variable` expression.
+pVariable :: Parser Expr
+pVariable = Variable <$> identifier
+
+-- | Parses a number (int or float).
+pNumber :: Parser Expr
+pNumber = lexeme $ choice [Float <$> pFloat, Int <$> pInt]
+
+-- | Basic expression terms.
+pTerm :: Parser Expr
+pTerm = choice [pNumber, pString, pVariable, pParens]
+
+------------------------------------------------------------------------------
+-- Strings and interpolated strings
+------------------------------------------------------------------------------
+
+pString :: Parser Expr
+pString = String . Plain <$> pBasicString
+
+-- | Parses a string constant, without interpolation.
+pBasicString :: Parser Text
+pBasicString = do
   start <- char '"' <|> char '\''
   loop start []
   where
@@ -118,30 +154,22 @@ pString = do
       <|> return (pack $ P.reverse acc)
       where escape c = loop stop (c : acc)
 
--- | Parses a non-keyword lower-case-starting identifier.
-identifier :: Parser Text
-identifier = notKeyword lowerIdent
+-- | Parses an interpolated string, NOT in quotes.
+pInterp :: Parser Interp
+pInterp = do
+  plain <- fromString <$> many (noneOf "$")
+  option plain $ do
+    char '$'
+    lookAhead anyChar >>= \case
+      -- If it's a letter, grab a variable.
+      c | isAlpha c -> Interp plain <$> var <*> pInterp
+      -- If it's an open parens, grab what's in the parens.
+      '(' -> Interp plain <$> parens <*> pInterp
+      -- Otherwise, just keep going and append what we have.
+      _ -> map (plain <>) pInterp
+  where var = Variable <$> lowerIdent'
+        parens = between (schar '(') (char ')') pExpr
 
--- | Parses anything that can be in a keypath, including digits.
-keyPathVar :: Parser Text
-keyPathVar = anyIdentifier <|> fmap render pInt
-
-
--- | Parses any identifier (upper- or lower-case).
-anyIdentifier :: Parser Text
-anyIdentifier = upperIdent <|> lowerIdent
-
--- | Parses an identifier and wraps in a `Variable` expression.
-pVariable :: Parser Expr
-pVariable = Variable <$> identifier
-
--- | Parses a number (int or float).
-pNumber :: Parser Expr
-pNumber = lexeme $ choice [Float <$> pFloat, Int <$> pInt]
-
--- | Basic expression terms.
-pTerm :: Parser Expr
-pTerm = choice [pNumber, String <$> pString, pVariable, pParens]
 
 ------------------------------------------------------------------------------
 -- Composite pExpressions

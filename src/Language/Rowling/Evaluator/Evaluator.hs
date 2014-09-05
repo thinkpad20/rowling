@@ -20,7 +20,13 @@ eval :: Expr -> Eval Value
 eval !expr = case expr of
   Int i -> return $ VInt i
   Float f -> return $ VFloat f
-  String s -> return $ VString s
+  String interp -> go interp where
+    go (Plain s) = return $ VString s
+    go (Interp in1 e in2) = do
+      VString s1 <- go in1
+      e' <- render <$> eval e
+      VString s2 <- go in2
+      return $ VString $ s1 <> e' <> s2
   Bool b -> return $ VBool b
   Variable var -> lookupNameOrError var
   Typed expr _ -> eval expr
