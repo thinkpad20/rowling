@@ -6,7 +6,8 @@ import Data.Char (isAlpha)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Set as S
 import Prelude (String)
-import Text.Parsec hiding (many, (<|>), spaces)
+import Text.Parsec hiding (many, (<|>), spaces, parse)
+import qualified Text.Parsec as Parsec
 
 import Language.Rowling.Common hiding (try)
 import Language.Rowling.Definitions.Types
@@ -52,7 +53,7 @@ keyword = try . sstring
 
 -- | Parses an identifier starting with a lower-case letter or underscore.
 lowerIdent :: Parser Text
-lowerIdent = lexeme lowerIdent
+lowerIdent = lexeme lowerIdent'
 
 -- | Parses an identifier, but doesn't consume trailing whitespace.
 lowerIdent' :: Parser Text
@@ -180,13 +181,6 @@ pExpr :: Parser Expr
 pExpr = do e <- pBinary <|> pLambda <|> pLet
            option e $ Typed e <$> (keysymbol "::" *> pType)
 
--- | An expression with a `.` and a field name.
-dot :: Parser Expr
-dot = pTerm >>= getNext where
-  getNext expr = option expr $ do
-    next <- schar '.' *> keyPathVar
-    getNext $ Dot expr next
-
 -- | An expression in parentheses. Tuples and record literals are also written
 -- this way.
 pParens :: Parser Expr
@@ -213,9 +207,16 @@ pLet = Let <$> var <*> expr <*> rest where
   expr = pExpr <* schar ';'
   rest = pExpr
 
+-- | An expression with a `.` and a field name.
+pDot :: Parser Expr
+pDot = pTerm >>= getNext where
+  getNext expr = option expr $ do
+    next <- schar '.' *> keyPathVar
+    getNext $ Dot expr next
+
 -- | An expression applied to another expression.
 pApply :: Parser Expr
-pApply = dot `chainl1` (pure Apply)
+pApply = pDot `chainl1` (pure Apply)
 
 -- | A lambda expression.
 pLambda :: Parser Expr
@@ -273,8 +274,11 @@ pTFunction = chainr1 pTApply (keysymbol "->" *> pure (==>))
 
 -- | Parse a string as an expression, or return an error.
 parseIt :: String -> Either ParseError Expr
-parseIt = parse (pExpr <* eof) ""
+parseIt = parse (pExpr <* eof)
 
 -- | Parse a string as a type, or return an error.
 parseType :: String -> Either ParseError Type
-parseType = parse (pType <* eof) ""
+parseType = parse (pType <* eof)
+
+parse :: Parser a -> String -> Either ParseError a
+parse p = Parsec.parse p ""

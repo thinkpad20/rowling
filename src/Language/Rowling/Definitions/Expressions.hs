@@ -30,6 +30,7 @@ data Expr = Int Integer -- ^ An integer literal.
 -- | Patterns are just expressions, although they're used differently.
 type Pattern = Expr
 
+-- | A string with interpolated expressions.
 data Interp = Plain Text
             | Interp Interp Expr Interp
             deriving (Show, Eq)

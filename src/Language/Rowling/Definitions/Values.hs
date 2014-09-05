@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Language.Rowling.Definitions.Value where
+module Language.Rowling.Definitions.Values where
 
 import Data.ContextStack
 import qualified GHC.Exts as GHC

@@ -13,7 +13,7 @@ import Data.ContextStack
 
 import Language.Rowling.Common
 import Language.Rowling.Definitions.Expressions
-import Language.Rowling.Definitions.Value
+import Language.Rowling.Definitions.Values
 
 -- | Evaluates an expression into a value.
 eval :: Expr -> Eval Value

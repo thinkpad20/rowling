@@ -11,7 +11,7 @@ import Data.String (IsString(..))
 
 import Language.Rowling.Common
 import Language.Rowling.Definitions.Expressions
-import Language.Rowling.Definitions.Value
+import Language.Rowling.Definitions.Values
 import Language.Rowling.Evaluator.Evaluator
 
 builtins :: HashMap Name Value

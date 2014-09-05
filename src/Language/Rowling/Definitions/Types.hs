@@ -14,11 +14,21 @@ import Data.Traversable
 
 import Language.Rowling.Common hiding (head, length)
 
-data Type = TRecord (HashMap Name Type) (Maybe Name)
-          | TConst Name
-          | TVar Name
-          | TApply Type Type
-          deriving (Show, Eq)
+-- | The type of expressions.
+data Type
+  -- | A record type. The optional name is a type variable for the "rest" of
+  -- the record, i.e., fields additional to the ones given. If `Nothing`, then
+  -- the type is considered exact.
+  = TRecord (HashMap Name Type) (Maybe Name)
+  -- | A type constant, such as @List@ or @Int@.
+  | TConst Name
+  -- | A type variable, which can be later unified to a specific type, or can
+  -- be left in for a polymorphic type.
+  | TVar Name
+  -- | Two types applied to each other. For example, @Just 1@ is the @Maybe@
+  -- type applied to the @Int@ type.
+  | TApply Type Type
+  deriving (Show, Eq)
 
 instance Render Type where
   render t = case t of
@@ -53,10 +63,10 @@ instance Default Type where
 
 -- | Checks if the type on the left is at least as general as the type on
 -- the right. For example, a type variable is at least as general as anything,
--- a tuple with a variable in the `k`th position is at least as general as a
--- tupe
--- an (a, Foo) tuple (where Foo is constant) is at least as general as ()
-(>==) :: Type -> Type -> Bool
+-- a `Float` is at least as general as an `Int`, etc.
+(>==) :: Type -- ^ The type which should be more general (e.g. a parameter).
+      -> Type -- ^ The type which can be more specific (e.g. an argument).
+      -> Bool -- ^ If the first type is at least as general as the second.
 TRecord fields1 r1 >== TRecord fields2 r2 =
   fields1 `vs` fields2 && case (r1, r2) of
     (Nothing, Nothing) -> True
@@ -77,9 +87,6 @@ TVar _ >== _ = True
 TApply t1 t2 >== TApply t3 t4 = t1 >== t3 && t2 >== t4
 _ >== _ = False
 
-isNumber :: Text -> Bool
-isNumber = T.all isDigit
-
 instance IsString Type where
   fromString s = do
     let s' = strip $ pack s
@@ -88,9 +95,9 @@ instance IsString Type where
     else TConst s'
 
 -- | Class of things which contain free variables. @freevars@ gets all of the
---  free variables out of a type. For example the type @a@ has free variables
--- {a}; the type @a -> b@ has free variables {a, b}; the type @Maybe (a ->
--- Int) -> b -> b@ has free variables {a, b}, etc.
+--  free variables out. For example, the type @a@ has free variables @{a}@,
+-- while the type @a -> b@ has free variables @{a, b}@; the type @Maybe (a ->
+-- Int) -> b -> c@ has free variables @{a, b, c}@, etc.
 class FreeVars a where freevars :: a -> Set Name
 instance FreeVars Type where
   freevars = \case
@@ -136,9 +143,11 @@ instance Default AliasMap where
 class Normalize t where
   normalizeS :: t -> State (Text, HashMap Name Name) t
 
+-- | Normalizes starting with `a`.
 normalize :: Normalize a => a -> a
 normalize = normalizeWith ("a", mempty)
 
+-- | Normalizes given some initial starting point.
 normalizeWith :: Normalize a => (Text, HashMap Name Name) -> a -> a
 normalizeWith state x = evalState (normalizeS x) state
 
@@ -148,11 +157,6 @@ instance Normalize Type where
     TApply a b -> TApply <$> normalizeS a <*> normalizeS b
     TRecord row rest -> TRecord <$> normalizeS row <*> normalizeS rest
     _ -> return type_
-
-next :: Text -> Text
-next name = case T.last name of
-  c | c < 'z' -> T.init name `T.snoc` succ c
-    | True    -> name `T.snoc` 'a'
 
 instance (Normalize a, Traversable f) => Normalize (f a) where
   normalizeS = mapM normalizeS
@@ -178,8 +182,21 @@ t1 ==> t2 = apply (apply "->" t1) t2
 
 infixr 3 ==>
 
+-- | Creates a polytype out of a type. Somewhat hacky.
 polytype :: Type -> Polytype
 polytype = Polytype mempty
 
+-- | Creates an exact (non-extensible) record type from a list of fields.
 tRecord :: [(Name, Type)] -> Type
 tRecord fields = TRecord (H.fromList fields) Nothing
+
+-- | Checks if the string is a number.
+isNumber :: Text -> Bool
+isNumber = T.all isDigit
+
+-- | Generates the next name in the "fresh name sequence". This sequence is:
+-- `a, b, c, ..., z, za, zb, zc, ... zz, zza, zzb, zzc...`
+next :: Text -> Text
+next name = case T.last name of
+  c | c < 'z' -> T.init name `T.snoc` succ c
+    | True    -> name `T.snoc` 'a'
