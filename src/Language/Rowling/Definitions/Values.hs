@@ -49,6 +49,7 @@ data EvalFrame = EvalFrame {
 instance KeyValueStore EvalFrame where
   type LookupKey EvalFrame = Name
   type StoredValue EvalFrame = ValOrArg
+  empty = def
   getValue name = lookup name . _fEnvironment
   putValue name val frame = frame {_fEnvironment = insertMap name val env}
     where env = _fEnvironment frame

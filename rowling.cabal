@@ -21,7 +21,7 @@ library
                      , Language.Rowling.Parser
                      , Language.Rowling.Definitions.Expressions
                      , Language.Rowling.Definitions.Types
-                     , Language.Rowling.Definitions.Value
+                     , Language.Rowling.Definitions.Values
                      , Language.Rowling.Evaluator.Builtins
                      , Language.Rowling.Evaluator.Evaluator
                      , Language.Rowling.TypeCheck.Builtins

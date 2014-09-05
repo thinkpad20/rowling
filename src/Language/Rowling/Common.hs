@@ -22,7 +22,6 @@ module Language.Rowling.Common (
     module Data.HashMap.Strict,
     module Data.Maybe,
     module GHC.Exts,
-    module System.Random,
     module Text.Render,
     Name, for, tuple
   ) where
@@ -48,7 +47,6 @@ import qualified Data.HashMap.Strict as H
 import Data.Maybe (fromJust)
 import qualified Data.Text as T
 import GHC.Exts (IsList)
-import System.Random (StdGen, mkStdGen, randomR)
 import Text.Render
 
 type Name = Text

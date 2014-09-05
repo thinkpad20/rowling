@@ -280,5 +280,8 @@ parseIt = parse (pExpr <* eof)
 parseType :: String -> Either ParseError Type
 parseType = parse (pType <* eof)
 
+parseInterp :: String -> Either ParseError Interp
+parseInterp = parse pInterp
+
 parse :: Parser a -> String -> Either ParseError a
 parse p = Parsec.parse p ""
