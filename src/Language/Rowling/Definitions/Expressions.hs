@@ -89,6 +89,9 @@ instance Monoid Interp where
 instance Semigroup Interp where
   (<>) = mappend
 
+addChar :: Interp -> Char -> Interp
+addChar interp c = interp <> Plain (singleton c)
+
 -- | Characters legal in symbols.
 symChars :: P.String
 symChars = "+-/*:|&^%$><"

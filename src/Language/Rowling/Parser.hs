@@ -20,7 +20,7 @@ type ParserState = ()
 type Parser = ParsecT String ParserState Identity
 
 ------------------------------------------------------------------------------
--- Basics
+-- * Basics
 ------------------------------------------------------------------------------
 
 -- | Set of keywords.
@@ -127,7 +127,7 @@ pTerm :: Parser Expr
 pTerm = choice [pNumber, pString, pVariable, pParens]
 
 ------------------------------------------------------------------------------
--- Strings and interpolated strings
+-- * Strings and interpolated strings
 ------------------------------------------------------------------------------
 
 pString :: Parser Expr
@@ -163,17 +163,27 @@ pInterp = do
     char '$'
     lookAhead anyChar >>= \case
       -- If it's a letter, grab a variable.
-      c | isAlpha c -> Interp plain <$> var <*> pInterp
+      c | isAlpha c -> Interp plain <$> dots <*> pInterp
       -- If it's an open parens, grab what's in the parens.
       '(' -> Interp plain <$> parens <*> pInterp
+      -- If there's a backslash, we're escaping whatever's next.
+      '\\' -> do c <- anyChar >> anyChar
+                 map ((plain `addChar` c) <>) pInterp
       -- Otherwise, just keep going and append what we have.
       _ -> map (plain <>) pInterp
   where var = Variable <$> lowerIdent'
+        dots = var >>= getDots
+        getDots expr = do
+          -- See if there's a period, AND that there is a letter immediately
+          -- following the period.
+          option expr $ try $ do
+            spaces >> char '.'
+            getDots =<< Dot expr <$> lowerIdent'
         parens = between (schar '(') (char ')') pExpr
 
 
 ------------------------------------------------------------------------------
--- Composite pExpressions
+-- * Composite pExpressions
 ------------------------------------------------------------------------------
 
 -- | A binary expression, lambda, or let. Can be annotated with a type.
@@ -230,7 +240,7 @@ pBinary :: Parser Expr
 pBinary = pApply `chainl1` fmap (flip binary) symbol
 
 ------------------------------------------------------------------------------
--- Types
+-- * Types
 ------------------------------------------------------------------------------
 
 -- | The top-level type parser.
@@ -269,7 +279,7 @@ pTFunction :: Parser Type
 pTFunction = chainr1 pTApply (keysymbol "->" *> pure (==>))
 
 ------------------------------------------------------------------------------
--- Running the parser
+-- * Running the parser
 ------------------------------------------------------------------------------
 
 -- | Parse a string as an expression, or return an error.
