@@ -13,6 +13,7 @@ main = hspec $ spec >> spec
 spec :: Spec
 spec = describe "parsing" $ do
   primitivesSpec
+  dotSpec
   lambdasSpec
   letSpec
   recordsSpec
@@ -29,6 +30,18 @@ primitivesSpec = describe "primitives" $ do
     parseIt "\"hello\"" `shouldBeR` String "hello"
     parseIt "True" `shouldBeR` Constructor "True"
     parseIt "Just" `shouldBeR` Constructor "Just"
+
+dotSpec :: Spec
+dotSpec = describe "dots" $ do
+  it "should parse dots" $ do
+    parseIt "a.foo" `shouldBeR` Dot "a" "foo"
+
+  it "should parse more complex stuff with dots" $ do
+    parseIt "(x + y).z" `shouldBeR` Dot (binary "x" "+" "y") "z"
+
+  it "should associate dots to the left" $ do
+    parseIt "a.b.c" `shouldBeR` Dot (Dot "a" "b") "c"
+
 
 lambdasSpec :: Spec
 lambdasSpec = describe "lambdas" $ do
