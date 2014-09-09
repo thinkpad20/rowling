@@ -5,6 +5,7 @@ import qualified Prelude as P
 import Data.Char (isAlpha)
 import qualified Data.HashMap.Strict as H
 import qualified Data.Set as S
+import qualified GHC.Exts as GHC
 import Prelude (String)
 import Text.Parsec hiding (many, (<|>), spaces, parse)
 import qualified Text.Parsec as Parsec
@@ -29,7 +30,7 @@ keywords = S.fromList ["if", "then", "else", "true", "false", "let", "with"]
 
 -- | Set of reserved symbols.
 keysymbols :: Set Text
-keysymbols = S.fromList ["->", "::", ":", "|"]
+keysymbols = S.fromList ["->", "::", ":", "|", "="]
 
 -- | Consumes any spaces (not other whitespace).
 spaces :: Parser String
@@ -93,7 +94,7 @@ keysymbol :: Text -> Parser Text
 keysymbol s = lexeme . try $ do
   sym <- many1 $ oneOf symChars
   if pack sym == s then return s
-  else unexpected $ "'" <> sym <> "' is not a '" <> unpack s <> "'"
+  else unexpected $ show sym <> " is not a " <> show s
 
 -- | Parses any non-reserved symbol.
 symbol :: Parser Text
@@ -113,18 +114,6 @@ keyPathVar = anyIdentifier <|> fmap render pInt
 -- | Parses any identifier (upper- or lower-case).
 anyIdentifier :: Parser Text
 anyIdentifier = upperIdent <|> lowerIdent
-
--- | Parses an identifier and wraps in a `Variable` expression.
-pVariable :: Parser Expr
-pVariable = Variable <$> identifier
-
--- | Parses a number (int or float).
-pNumber :: Parser Expr
-pNumber = lexeme $ choice [Float <$> pFloat, Int <$> pInt]
-
--- | Basic expression terms.
-pTerm :: Parser Expr
-pTerm = choice [pNumber, pString, pVariable, pParens]
 
 ------------------------------------------------------------------------------
 -- * Strings and interpolated strings
@@ -171,11 +160,11 @@ pInterp = do
                  map ((plain `addChar` c) <>) pInterp
       -- Otherwise, just keep going and append what we have.
       _ -> map (plain <>) pInterp
-  where var = Variable <$> lowerIdent'
-        dots = var >>= getDots
+  where dots = map Variable lowerIdent' >>= getDots
         getDots expr = do
           -- See if there's a period, AND that there is a letter immediately
-          -- following the period.
+          -- following the period. If so, grab another identifier; otherwise
+          -- return what we have so far.
           option expr $ try $ do
             spaces >> char '.'
             getDots =<< Dot expr <$> lowerIdent'
@@ -183,12 +172,25 @@ pInterp = do
 
 
 ------------------------------------------------------------------------------
--- * Composite pExpressions
+-- * Expressions
 ------------------------------------------------------------------------------
+
+-- | Parses an identifier and wraps in a `Variable` expression.
+pVariable :: Parser Expr
+pVariable = choice [Variable <$> lower, Constructor <$> upperIdent] where
+  lower = notKeyword lowerIdent
+
+-- | Parses a number (int or float).
+pNumber :: Parser Expr
+pNumber = lexeme $ choice [Float <$> pFloat, Int <$> pInt]
+
+-- | Basic expression terms.
+pTerm :: Parser Expr
+pTerm = choice [pNumber, pString, pVariable, pParens, pList]
 
 -- | A binary expression, lambda, or let. Can be annotated with a type.
 pExpr :: Parser Expr
-pExpr = do e <- pBinary <|> pLambda <|> pLet
+pExpr = do e <- choice [pBinary, pLambda, pLet, pIf]
            option e $ Typed e <$> (keysymbol "::" *> pType)
 
 -- | An expression in parentheses. Tuples and record literals are also written
@@ -202,9 +204,13 @@ pParens = between (schar '(') (schar ')') getValues where
       ([e], []) -> return e
       (es, kvs) -> return $ Record $ H.fromList $ makeTuple es <> kvs
   getBareExprs = bareExpr `sepEndBy` schar ','
-  bareExpr = try $ pExpr <* notFollowedBy (keysymbol ":")
+  bareExpr = try $ pExpr <* notFollowedBy (char '=')
   getKeyVals = keyVal `sepEndBy` schar ','
-  keyVal = (,) <$> identifier <*> (keysymbol ":" *> pExpr)
+  keyVal = (,) <$> identifier <*> (sstring "=" *> pExpr)
+
+pList :: Parser Expr
+pList = grab $ between (schar '[') (schar ']') $ pExpr `sepBy` schar ','
+  where grab = map GHC.fromList
 
 -- | Creates a "tuple" (record with integer fields) from an expression list.
 makeTuple :: [Expr] -> [(Text, Expr)]
@@ -216,6 +222,12 @@ pLet = Let <$> var <*> expr <*> rest where
   var = keyword "let" *> identifier <* schar '='
   expr = pExpr <* schar ';'
   rest = pExpr
+
+-- | An if statement.
+pIf :: Parser Expr
+pIf = If <$ keyword "if"    <*> pExpr
+         <* keyword "then"  <*> pExpr
+         <* keyword "else"  <*> pExpr
 
 -- | An expression with a `.` and a field name.
 pDot :: Parser Expr

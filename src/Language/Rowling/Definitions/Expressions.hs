@@ -3,6 +3,7 @@
 module Language.Rowling.Definitions.Expressions where
 
 import qualified Prelude as P
+import Data.Char (isUpper)
 import qualified Data.Text as T
 import qualified Data.Set as S
 import qualified Data.HashMap.Strict as H
@@ -15,8 +16,8 @@ import Language.Rowling.Definitions.Types
 data Expr = Int Integer -- ^ An integer literal.
           | Float Double -- ^ An floating-point literal.
           | String Interp -- ^ A string literal.
-          | Bool Bool -- ^ A boolean literal.
           | Variable Name -- ^ A variable.
+          | Constructor Name -- ^ A constructor.
           | Typed Expr Type -- ^ An expression with annotated type.
           | Lambda Pattern Expr -- ^ A lambda expression.
           | Let Name Expr Expr -- ^ A let expression.
@@ -36,7 +37,9 @@ data Interp = Plain Text
             deriving (Show, Eq)
 
 instance IsString Expr where
-  fromString = Variable . fromString
+  fromString "" = error "Empty variable string"
+  fromString var@(c:_) | isUpper c = Constructor $ fromString var
+                       | otherwise = Variable $ fromString var
 
 instance IsList Expr where
   type Item Expr = Expr
@@ -49,7 +52,7 @@ instance Render Expr where
     Int i -> render i
     Float f -> render f
     String t -> render t
-    Bool b -> render b
+    Constructor name -> name
     Variable name -> name
     Typed expr typ -> render expr <> " :: " <> render typ
     Lambda e1 e2 -> "λ" <> renderParens e1 <> " -> " <> render e2

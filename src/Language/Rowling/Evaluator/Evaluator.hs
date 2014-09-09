@@ -27,7 +27,8 @@ eval !expr = case expr of
       e' <- render <$> eval e
       VString s2 <- go in2
       return $ VString $ s1 <> e' <> s2
-  Bool b -> return $ VBool b
+  Constructor "True" -> return $ VBool True
+  Constructor "False" -> return $ VBool False
   Variable var -> lookupNameOrError var
   Typed expr _ -> eval expr
   Lambda param body -> do

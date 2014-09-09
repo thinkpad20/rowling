@@ -4,7 +4,7 @@ module Language.Rowling.TypeLibSpec (spec) where
 import SpecHelper
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as H
-import Language.Rowling.TypeLib
+import Language.Rowling.Definitions.Types
 
 spec :: Spec
 spec = do

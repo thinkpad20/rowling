@@ -9,6 +9,8 @@ import Language.Rowling.Evaluator.Evaluator
 import Language.Rowling.Evaluator.Builtins
 import Language.Rowling.Parser
 
+-- * Running the evaluator monad.
+
 runEval :: Eval a -> IO (a, EvalState)
 runEval = runEvalWith $ def {_fEnvironment = Val <$> builtins}
 

@@ -69,3 +69,5 @@ Test-Suite spec
                       , hspec
                       , context-stack
                       , data-default
+                      , text
+                      , hspec-expectations

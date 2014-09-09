@@ -4,8 +4,9 @@ module Language.Rowling.TypeCheckerSpec (spec) where
 import SpecHelper
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as H
-import Language.Rowling.AST
-import Language.Rowling.TypeChecker
+import Language.Rowling.Definitions.Expressions
+import Language.Rowling.Definitions.Types
+import Language.Rowling.TypeCheck.TypeChecker
 
 spec :: Spec
 spec = do
@@ -14,7 +15,7 @@ spec = do
       typeExpr (Int 0) `shouldBeR` "Int"
       typeExpr (Float 0) `shouldBeR` "Float"
       typeExpr (String "hey there") `shouldBeR` "String"
-      typeExpr (Bool True) `shouldBeR` "Bool"
+      typeExpr "True" `shouldBeR` "Bool"
 
   describe "complex types" $ do
     it "should type lists" $ do

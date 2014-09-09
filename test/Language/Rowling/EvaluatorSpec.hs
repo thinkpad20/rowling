@@ -6,9 +6,9 @@ module Language.Rowling.EvaluatorSpec (main, spec) where
 
 import SpecHelper
 import ClassyPrelude
-import Language.Rowling.AST
-import Language.Rowling.Value
-import Language.Rowling.RunEvaluator
+import Language.Rowling.Definitions.Expressions
+import Language.Rowling.Definitions.Values
+import Language.Rowling.Evaluator
 
 main :: IO ()
 main = hspec spec
@@ -34,7 +34,7 @@ spec = describe "evaluation" $ do
 
   describe "if statements" $ do
     it "should evaluate if statements" $ do
-      let input = If (Bool False) (Int 1) (Int 2)
+      let input = If "False" (Int 1) (Int 2)
           output = VInt 2
       evalExpr input `shouldBeM` output
 
@@ -52,7 +52,7 @@ primitivesSpec = describe "primitives" $ do
     evalExpr (Int 3) `shouldBeM` VInt 3
     evalExpr (Float 3) `shouldBeM` VFloat 3
     evalExpr (String "hello") `shouldBeM` VString "hello"
-    evalExpr (Bool True) `shouldBeM` VBool True
+    evalExpr "True" `shouldBeM` VBool True
 
 functionSpec :: Spec
 functionSpec = describe "functions" $ do
@@ -241,24 +241,24 @@ builtinSpec = describe "builtins" $ do
 
   describe "boolean operations" $ do
     it "should negate a bool" $ do
-      evalExpr (Apply "not" (Bool True)) `shouldBeM` VBool False
-      evalExpr (Apply "not" (Bool False)) `shouldBeM` VBool True
+      evalExpr (Apply "not" "True") `shouldBeM` VBool False
+      evalExpr (Apply "not" "False") `shouldBeM` VBool True
 
     it "should AND bools" $ do
-      evalExpr (binary (Bool True) "&&" (Bool False)) `shouldBeM` VBool False
-      evalExpr (binary (Bool True) "&&" (Bool True)) `shouldBeM` VBool True
-      evalExpr (binary (Bool False) "&&" (Bool True)) `shouldBeM` VBool False
-      evalExpr (binary (Bool False) "&&" (Bool False)) `shouldBeM` VBool False
+      evalExpr (binary "True" "&&" "False") `shouldBeM` VBool False
+      evalExpr (binary "True" "&&" "True") `shouldBeM` VBool True
+      evalExpr (binary "False" "&&" "True") `shouldBeM` VBool False
+      evalExpr (binary "False" "&&" "False") `shouldBeM` VBool False
 
     it "should OR bools" $ do
-      evalExpr (binary (Bool True) "||" (Bool False)) `shouldBeM` VBool True
-      evalExpr (binary (Bool True) "||" (Bool True)) `shouldBeM` VBool True
-      evalExpr (binary (Bool False) "||" (Bool True)) `shouldBeM` VBool True
-      evalExpr (binary (Bool False) "||" (Bool False)) `shouldBeM` VBool False
+      evalExpr (binary "True" "||" "False") `shouldBeM` VBool True
+      evalExpr (binary "True" "||" "True") `shouldBeM` VBool True
+      evalExpr (binary "False" "||" "True") `shouldBeM` VBool True
+      evalExpr (binary "False" "||" "False") `shouldBeM` VBool False
 
   describe "map" $ do
     it "should apply a function to each element of a list" $ do
-      let list = List [Bool True, Bool True, Bool False]
+      let list = List ["True", "True", "False"]
           input = Apply (Apply "each" list) "not"
           output = VList [VBool False, VBool False, VBool True]
       evalExpr input `shouldBeM` output

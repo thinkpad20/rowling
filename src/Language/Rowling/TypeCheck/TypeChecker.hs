@@ -175,7 +175,8 @@ typeOf expr = go expr `catchError` whenTyping where
   go = \case
     Int _ -> only "Int"
     Float _ -> only "Float"
-    Bool _ -> only "Bool"
+    Constructor "True" -> only "Bool"
+    Constructor "False" -> only "Bool"
     String _ -> only "String"
     Variable name -> findOrError' name >>= instantiate >>= only where
       findOrError' = findOrError $
