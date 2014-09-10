@@ -38,7 +38,7 @@ spec = describe "evaluation" $ do
           output = VInt 2
       evalExpr input `shouldBeM` output
 
-  functionSpec
+  lambdaSpec
 
   builtinSpec
 
@@ -54,113 +54,122 @@ primitivesSpec = describe "primitives" $ do
     evalExpr (String "hello") `shouldBeM` VString "hello"
     evalExpr "True" `shouldBeM` VBool True
 
-functionSpec :: Spec
-functionSpec = describe "functions" $ do
-  describe "closures" $ do
-    it "should evaluate a lambda with no captures" $ do
-      let input = idfunc
-          output = VClosure {
-            _cEnvironment = [("x", Arg)],
-            _cBody = "x"
-          }
+lambdaSpec :: Spec
+lambdaSpec = describe "lambdas" $ do
+  it "should evaluate a lambda with no captures" $ do
+    let input = idfunc
+        output = VClosure {
+          _cEnvironment = [("x", Arg)],
+          _cBody = "x"
+        }
+    evalExpr input `shouldBeM` output
+    let input = singlelist
+        output = VClosure {
+          _cEnvironment = [("x", Arg)],
+          _cBody = ["x"]
+        }
+    evalExpr input `shouldBeM` output
+
+  it "should evaluate a lambda with captures" $ do
+    let input = capturingFunc
+        output = VClosure {
+          _cEnvironment = [("x", Val $ VInt 3), ("y", Arg)],
+          _cBody = Apply "y" "x"
+        }
+    evalExpr input `shouldBeM` output
+
+  it "should evaluate nested lambdas" $ do
+    let input1 = apply
+        output1 = VClosure {
+          _cEnvironment = [("x", Arg)],
+          _cBody = Lambda "y" $ Apply "x" "y"
+        }
+    evalExpr input1 `shouldBeM` output1
+
+    let input2 = weird
+        output2 = VClosure {
+          _cEnvironment = [("x", Arg)],
+          _cBody = Let "y" "x" $ Lambda "z" $ Apply "z" "y"
+        }
+    evalExpr input2 `shouldBeM` output2
+
+applicationSpec :: Spec
+applicationSpec = describe "function application" $ do
+  it "should evaluate an application" $ do
+    let input = Apply idfunc $ Int 0
+        output = VInt 0
+    evalExpr input `shouldBeM` output
+
+  it "should apply a nested lambda" $ do
+    let input = Apply apply idfunc
+        output = VClosure {
+          _cEnvironment = [
+            ("x", Val $ VClosure {
+              _cEnvironment = [("x", Arg)],
+              _cBody = "x"
+            }),
+            ("y", Arg)
+          ],
+          _cBody = Apply "x" "y"
+        }
+    evalExpr input `shouldBeM` output
+
+  it "should apply that function and act like the id function" $ do
+    let input = Apply (Apply apply idfunc) $ String "wazzap"
+        output = VString "wazzap"
+    evalExpr input `shouldBeM` output
+
+  it "should build tagged unions" $ do
+    let input = Apply (Apply "Pair" (Int 1)) (Int 2)
+        output = VTagged "Pair" [VInt 1, VInt 2]
+    evalExpr input `shouldBeM` output
+
+    let input = Apply (Apply "Pair" (Apply "Just" (Int 1))) (Int 2)
+        output = VTagged "Pair" [VTagged "Just" [VInt 1], VInt 2]
+    evalExpr input `shouldBeM` output
+
+  describe "records in functions" $ do
+    it "should evaluate record arguments" $ do
+      let func = Lambda "r" $ "r" `Dot` "foo"
+          input = Apply func $ Record [("foo", Int 10)]
+          output = VInt 10
       evalExpr input `shouldBeM` output
-      let input = singlelist
-          output = VClosure {
-            _cEnvironment = [("x", Arg)],
-            _cBody = ["x"]
-          }
+
+    it "should return records" $ do
+      let func = Lambda "x" $ Record [("foo", "x"), ("bar", "x")]
+          input1 = Int 10
+          output1 = VRecord [("foo", VInt 10), ("bar", VInt 10)]
+          input2 = Record [("baz", Int 10)]
+          output2 = VRecord [("foo", VRecord [("baz", VInt 10)]),
+                             ("bar", VRecord [("baz", VInt 10)])]
+      evalExpr (Apply func input1) `shouldBeM` output1
+      evalExpr (Apply func input2) `shouldBeM` output2
+
+      let func = Lambda "x" $ Record [("a", "x" `Dot` "b"),
+                                      ("b", "x" `Dot` "a")]
+          input = Record [("a", Int 1), ("b", Float 1)]
+          output = VRecord [("b", VInt 1), ("a", VFloat 1)]
+      evalExpr (Apply func input) `shouldBeM` output
+
+    it "should evaluate records that contain functions" $ do
+      let func = Lambda "r" $ Apply ("r" `Dot` "f") (Int 6)
+          input = Apply func $ Record [("f", idfunc)]
+          output = VInt 6
       evalExpr input `shouldBeM` output
 
-    it "should evaluate a lambda with captures" $ do
-      let input = capturingFunc
-          output = VClosure {
-            _cEnvironment = [("x", Val $ VInt 3), ("y", Arg)],
-            _cBody = Apply "y" "x"
-          }
+  describe "lists in functions" $ do
+    it "should produce a list" $ do
+      let input = (Apply (Lambda "x" ["x"]) (Float 1))
+          output = [VFloat 1]
       evalExpr input `shouldBeM` output
 
-    it "should evaluate nested lambdas" $ do
-      let input1 = apply
-          output1 = VClosure {
-            _cEnvironment = [("x", Arg)],
-            _cBody = Lambda "y" $ Apply "x" "y"
-          }
-      evalExpr input1 `shouldBeM` output1
-
-      let input2 = weird
-          output2 = VClosure {
-            _cEnvironment = [("x", Arg)],
-            _cBody = Let "y" "x" $ Lambda "z" $ Apply "z" "y"
-          }
-      evalExpr input2 `shouldBeM` output2
-
-  describe "function application" $ do
-    it "should evaluate an application" $ do
-      let input = Apply idfunc $ Int 0
-          output = VInt 0
+      let input = (Apply (Lambda "x" ["x", "x"]) (Float 1))
+          output = [VFloat 1, VFloat 1]
       evalExpr input `shouldBeM` output
 
-    it "should apply a nested lambda" $ do
-      let input = Apply apply idfunc
-          output = VClosure {
-            _cEnvironment = [
-              ("x", Val $ VClosure {
-                _cEnvironment = [("x", Arg)],
-                _cBody = "x"
-              }),
-              ("y", Arg)
-            ],
-            _cBody = Apply "x" "y"
-          }
+      let input = (Apply (Lambda "x" [Float 2, "x"]) (Float 1))
+          output = [VFloat 2, VFloat 1]
       evalExpr input `shouldBeM` output
-
-    it "should apply that function and act like the id function" $ do
-      let input = Apply (Apply apply idfunc) $ String "wazzap"
-          output = VString "wazzap"
-      evalExpr input `shouldBeM` output
-
-    describe "records in functions" $ do
-      it "should evaluate record arguments" $ do
-        let func = Lambda "r" $ "r" `Dot` "foo"
-            input = Apply func $ Record [("foo", Int 10)]
-            output = VInt 10
-        evalExpr input `shouldBeM` output
-
-      it "should return records" $ do
-        let func = Lambda "x" $ Record [("foo", "x"), ("bar", "x")]
-            input1 = Int 10
-            output1 = VRecord [("foo", VInt 10), ("bar", VInt 10)]
-            input2 = Record [("baz", Int 10)]
-            output2 = VRecord [("foo", VRecord [("baz", VInt 10)]),
-                               ("bar", VRecord [("baz", VInt 10)])]
-        evalExpr (Apply func input1) `shouldBeM` output1
-        evalExpr (Apply func input2) `shouldBeM` output2
-
-        let func = Lambda "x" $ Record [("a", "x" `Dot` "b"),
-                                        ("b", "x" `Dot` "a")]
-            input = Record [("a", Int 1), ("b", Float 1)]
-            output = VRecord [("b", VInt 1), ("a", VFloat 1)]
-        evalExpr (Apply func input) `shouldBeM` output
-
-      it "should evaluate records that contain functions" $ do
-        let func = Lambda "r" $ Apply ("r" `Dot` "f") (Int 6)
-            input = Apply func $ Record [("f", idfunc)]
-            output = VInt 6
-        evalExpr input `shouldBeM` output
-
-    describe "lists in functions" $ do
-      it "should produce a list" $ do
-        let input = (Apply (Lambda "x" ["x"]) (Float 1))
-            output = [VFloat 1]
-        evalExpr input `shouldBeM` output
-
-        let input = (Apply (Lambda "x" ["x", "x"]) (Float 1))
-            output = [VFloat 1, VFloat 1]
-        evalExpr input `shouldBeM` output
-
-        let input = (Apply (Lambda "x" [Float 2, "x"]) (Float 1))
-            output = [VFloat 2, VFloat 1]
-        evalExpr input `shouldBeM` output
 
 builtinSpec :: Spec
 builtinSpec = describe "builtins" $ do

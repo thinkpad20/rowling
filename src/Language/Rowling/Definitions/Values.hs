@@ -21,6 +21,8 @@ data Value = VInt Integer                  -- ^ An integer.
            | VList (Vector Value)          -- ^ A list of values.
            | VTagged Name (Vector Value)
            -- ^ A tagged union, like a Maybe.
+           | VMaybe (Maybe Value)
+           -- ^ A maybe (using the Haskell type for efficiency)
            | VBuiltin Builtin              -- ^ A builtin function.
            | VRecord (HashMap Name Value)
            -- ^ An instantiated Record (Model).
@@ -61,6 +63,8 @@ patternMatch p v = case (p, v) of
   -- | True and false are constructors
   (Constructor "True", VBool True) -> Just mempty
   (Constructor "False", VBool False) -> Just mempty
+  (Constructor "None", VMaybe Nothing) -> Just mempty
+  (Apply (Constructor "Some") p, VMaybe (Just v)) -> patternMatch p v
   -- A variable can match with anything.
   (Variable name, v) -> Just [(name, v)]
   -- With a list expression, it matches if and only if all of them match.

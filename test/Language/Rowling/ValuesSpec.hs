@@ -16,25 +16,39 @@ spec = patternMatchSpec
 
 patternMatchSpec :: Spec
 patternMatchSpec = describe "pattern matching" $ do
-  it "shouldn't match literals that don't equal" $ do
-    noMatch (Int 1) (VInt 2)
-    noMatch (Float 1) (VFloat 2)
-    noMatch "True" (VBool False)
-    noMatch (String "hey") (VString "yo")
   it "should match literals that equal" $ do
     match (Int 1) (VInt 1)
     match (Float 1) (VFloat 1)
     match "False" (VBool False)
-    match "True" (VBool True)
     match (String "wazzap") (VString "wazzap")
+
+  it "shouldn't match literals that aren't equal" $ do
+    noMatch (Int 1) (VInt 2)
+    noMatch (Float 1) (VFloat 2)
+    noMatch (String "hey") (VString "yo")
+
   it "should match variables" $ do
     let vals :: [Value] = [VInt 1, VFloat 1, VBool True, ["hello", "world"]]
     forM_ vals $ \val ->
       matchWith (Variable "x") val [("x", val)]
+
   it "should match in lists" $ do
     match [Int 1, Int 2] [VInt 1, VInt 2]
     matchWith ["a", Int 1] [VInt 0, VInt 1] [("a", VInt 0)]
     noMatch ["a", Int 1] [VInt 0, VInt 2]
+
+  describe "haskell builtins" $ do
+    it "should use haskell booleans" $ do
+      match "True" (VBool True)
+      match "False" (VBool False)
+      noMatch "False" (VBool True)
+      noMatch "True" (VBool False)
+
+    it "should use haskell maybes" $ do
+      match "None" (VMaybe Nothing)
+      match (Apply "Some" (Int 3)) (VMaybe (Just $ VInt 3))
+      noMatch "None" (VMaybe $ Just (VInt 0))
+
   describe "compound expressions" $ do
     it "should match singleton constructors" $ do
       match "Foo" (VTagged "Foo" [])

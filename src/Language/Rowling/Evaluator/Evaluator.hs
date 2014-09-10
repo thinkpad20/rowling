@@ -2,6 +2,7 @@
              FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedLists #-}
 module Language.Rowling.Evaluator.Evaluator where
 
 import qualified Prelude as P
@@ -29,6 +30,7 @@ eval !expr = case expr of
       return $ VString $ s1 <> e' <> s2
   Constructor "True" -> return $ VBool True
   Constructor "False" -> return $ VBool False
+  Constructor n -> return $ VTagged n []
   Variable var -> lookupNameOrError var
   Typed expr _ -> eval expr
   Lambda param body -> do
@@ -42,6 +44,7 @@ eval !expr = case expr of
     arg <- eval e2
     eval e1 >>= \case
       VClosure env body -> withFrame (EvalFrame arg env) $ eval body
+      VTagged n vs -> return $ VTagged n (vs ++ [arg])
       VBuiltin (Builtin _ func) -> func arg
   Dot expr name -> deref name <$> eval expr
   Record fields -> VRecord <$> mapM eval fields
