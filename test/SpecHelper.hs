@@ -2,7 +2,8 @@
 module SpecHelper
     ( module Test.Hspec
     , module Language.Rowling.Common
-    , shouldBeM, shouldBeR, shouldHaveErr, shouldBeMR
+    , shouldBeM, shouldBeR, shouldHaveErr, shouldBeMR, shouldBeJ
+    , shouldBeN
     ) where
 
 import Test.Hspec
@@ -16,6 +17,18 @@ shouldBeM action expected = do
   result `shouldBe` expected
 
 infixr 0 `shouldBeM`
+
+-- | Asserts that the first argument is a `Just` value equal to the second
+-- argument.
+shouldBeJ :: (Show a, Eq a) => Maybe a -> a -> IO ()
+shouldBeJ x y = do
+  shouldSatisfy x isJust
+  let Just x' = x
+  x' `shouldBe` y
+
+-- | Asserts that the argument is `Nothing`.
+shouldBeN :: (Show a) => Maybe a -> IO ()
+shouldBeN = flip shouldSatisfy isNothing
 
 -- | Asserts that the first argument is a `Right` value equal to the second
 -- argument.

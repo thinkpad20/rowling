@@ -44,7 +44,7 @@ import Data.Char (isDigit)
 import Data.Default
 import Data.HashMap.Strict (HashMap, keys, (!))
 import qualified Data.HashMap.Strict as H
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isJust, isNothing)
 import qualified Data.Text as T
 import GHC.Exts (IsList)
 import Text.Render

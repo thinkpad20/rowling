@@ -15,9 +15,9 @@ import Language.Rowling.Definitions.Types
 -- | The expression type.
 data Expr = Int Integer -- ^ An integer literal.
           | Float Double -- ^ An floating-point literal.
-          | String Interp -- ^ A string literal.
+          | String Interp -- ^ A string literal with interpolated expressions.
           | Variable Name -- ^ A variable.
-          | Constructor Name -- ^ A constructor.
+          | Constructor Name -- ^ A constructor (e.g. @Just@, @False@, etc).
           | Typed Expr Type -- ^ An expression with annotated type.
           | Lambda Pattern Expr -- ^ A lambda expression.
           | Let Name Expr Expr -- ^ A let expression.

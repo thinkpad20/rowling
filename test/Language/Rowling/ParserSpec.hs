@@ -8,7 +8,7 @@ import Language.Rowling.Definitions.Expressions
 import Language.Rowling.Parser
 
 main :: IO ()
-main = hspec $ spec >> spec
+main = hspec spec
 
 spec :: Spec
 spec = describe "parsing" $ do
@@ -41,7 +41,6 @@ dotSpec = describe "dots" $ do
 
   it "should associate dots to the left" $ do
     parseIt "a.b.c" `shouldBeR` Dot (Dot "a" "b") "c"
-
 
 lambdasSpec :: Spec
 lambdasSpec = describe "lambdas" $ do

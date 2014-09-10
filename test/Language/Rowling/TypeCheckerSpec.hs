@@ -2,6 +2,7 @@
 module Language.Rowling.TypeCheckerSpec (spec) where
 
 import SpecHelper
+import ClassyPrelude hiding (assert)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as H
 import Language.Rowling.Definitions.Expressions
