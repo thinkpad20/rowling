@@ -22,7 +22,7 @@ patternMatchSpec = describe "pattern matching" $ do
     match "False" (VBool False)
     match (String "wazzap") (VString "wazzap")
 
-  it "shouldn't match literals that aren't equal" $ do
+  it "should not match literals that are not equal" $ do
     noMatch (Int 1) (VInt 2)
     noMatch (Float 1) (VFloat 2)
     noMatch (String "hey") (VString "yo")
@@ -32,7 +32,7 @@ patternMatchSpec = describe "pattern matching" $ do
     forM_ vals $ \val ->
       matchWith (Variable "x") val [("x", val)]
 
-  it "should match in lists" $ do
+  it "should match list patterns" $ do
     match [Int 1, Int 2] [VInt 1, VInt 2]
     matchWith ["a", Int 1] [VInt 0, VInt 1] [("a", VInt 0)]
     noMatch ["a", Int 1] [VInt 0, VInt 2]
@@ -75,10 +75,11 @@ patternMatchSpec = describe "pattern matching" $ do
       noMatch (Apply (Apply "A" (Apply "B" (Int 1))) "x")
               (VTagged "A" [VTagged "B" [VInt 2], VString "hello"])
 
-  where matchWith :: Pattern -> Value -> HashMap Name Value -> IO ()
-        matchWith p v bs = patternMatch p v `shouldBeJ` bs
-        match :: Pattern -> Value -> IO ()
-        match p v = matchWith p v []
-        noMatch :: Pattern -> Value -> IO ()
-        noMatch p v = shouldBeN $ patternMatch p v
+  where
+    matchWith :: Pattern -> Value -> HashMap Name Value -> IO ()
+    matchWith p v bs = patternMatch p v `shouldBeJ` bs
+    match :: Pattern -> Value -> IO ()
+    match p v = matchWith p v []
+    noMatch :: Pattern -> Value -> IO ()
+    noMatch p v = shouldBeN $ patternMatch p v
 

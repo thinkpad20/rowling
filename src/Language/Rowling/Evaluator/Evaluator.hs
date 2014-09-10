@@ -21,61 +21,56 @@ eval :: Expr -> Eval Value
 eval !expr = case expr of
   Int i -> return $ VInt i
   Float f -> return $ VFloat f
-  String interp -> go interp where
-    go (Plain s) = return $ VString s
-    go (Interp in1 e in2) = do
-      VString s1 <- go in1
+  String interp -> loop interp where
+    loop (Plain s) = return $ VString s
+    loop (Interp in1 e in2) = do
+      VString s1 <- loop in1
       e' <- render <$> eval e
-      VString s2 <- go in2
+      VString s2 <- loop in2
       return $ VString $ s1 <> e' <> s2
   Constructor "True" -> return $ VBool True
   Constructor "False" -> return $ VBool False
   Constructor n -> return $ VTagged n []
-  Variable var -> lookupNameOrError var
+  Variable var -> findOrHardError var
   Typed expr _ -> eval expr
   Lambda param body -> do
     env <- getClosure expr
-    return $ VClosure (getParamBindings param <> env) body
+    return $ VClosure env param body
   Let var e1 e2 -> do
-    expr <- eval e1
-    modifyTopM $ putValue var $ Val expr
+    modifyTopM . putValue var =<< eval e1
     eval e2
   Apply e1 e2 -> do
     arg <- eval e2
     eval e1 >>= \case
-      VClosure env body -> withFrame (EvalFrame arg env) $ eval body
+      -- See if the lambda's parameter matches the argument.
+      VClosure env param body -> case patternMatch param arg of
+        -- If it doesn't, it's an error!
+        Nothing -> errorC ["Pattern match failure: argument ", render arg,
+                           " does not match pattern ", render param]
+        -- Otherwise, load the bindings and evaluate the body.
+        Just bs -> withFrame (EvalFrame arg (bs <> env)) $ eval body
       VTagged n vs -> return $ VTagged n (vs ++ [arg])
       VBuiltin (Builtin _ func) -> func arg
   Dot expr name -> deref name <$> eval expr
   Record fields -> VRecord <$> mapM eval fields
-  List exprs -> VList <$> mapM eval exprs
+  List exprs -> VArray <$> mapM eval exprs
   If test ifTrue ifFalse -> eval test >>= \case
     VBool True -> eval ifTrue
     VBool False -> eval ifFalse
     val -> errorC ["Non-boolean test for if expression: ", render val]
 
-
--- | Converts a `ValOrArg` into a `Value`, by converting references to `Arg`
--- to the actual current argument value.
-extractVal :: ValOrArg -> Eval Value
-extractVal voa = case voa of
-  Arg -> _fArgument <$> gets topFrame
-  Val v -> return v
-  VDot voa name -> deref name <$> extractVal voa
-
--- | Looks up a name (with failure possible) and extracts the value from it.
-lookupNameOrError :: Name -> Eval Value
-lookupNameOrError name = extractVal =<< findOrHardError name
-
 -- | Calculates the closure (variables inherited from outside scope) of an
--- expression.
-getClosure :: Expr -> Eval (HashMap Name ValOrArg)
+-- expression. Only gets free variables, not bound. For example, in the
+-- expression @λx -> f x 1@, the variable @x@ is bound, while the variable
+-- @f@ is free. Therefore, @f@ will wind up in the closure, while @x@ won't.
+getClosure :: Expr -> Eval (Record Value)
 getClosure = flip evalStateT [] . loop where
-  loop :: Expr -> StateT [Set Name] Eval (HashMap Name ValOrArg)
+  -- Uses a stack of sets of names to keep track of bound variables.
+  loop :: Expr -> StateT [Set Name] Eval (Record Value)
   loop !(Variable name) = isBound name >>= \case
     True -> return mempty
-    False -> do val <- lift $ lookupNameOrError name
-                return $ H.singleton name (Val val)
+    False -> do val <- lift $ findOrHardError name
+                return [(name, val)]
   loop !(Lambda param body) = withNames (getNames param) $ loop body
   loop !(Let name e1 e2) = withNames (S.singleton name) $ loop2 e1 e2
   loop !(Apply e1 e2) = loop2 e1 e2
@@ -89,20 +84,10 @@ getClosure = flip evalStateT [] . loop where
     look [] = return False
     look (names:rest) = if S.member name names then return True else look rest
 
--- | Gets the variable names out of an expression argument.
-getNames :: Expr -> Set Name
+-- | Gets the variable names out of a pattern. These variables are bound in
+-- downstream scopes.
+getNames :: Pattern -> Set Name
 getNames !(Variable name) = S.singleton name
 getNames !(Record fields) = foldl' (<>) mempty $ fmap getNames fields
+getNames !(Apply e1 e2)   = getNames e1 <> getNames e2
 getNames _ = mempty
-
--- | Creates an evaluation environment from the patterns in an expression.
-getParamBindings :: Expr -> HashMap Name ValOrArg
-getParamBindings = go Arg where
-  go val pattern = case pattern of
-    Variable name -> H.singleton name val
-    Record fields -> goFields val $ H.toList fields
-    _ -> mempty
-  goFields _ [] = mempty
-  goFields val ((name, pattern):rest) = go (VDot val name) pattern
-                                        <> goFields val rest
-

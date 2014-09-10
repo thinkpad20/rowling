@@ -15,7 +15,7 @@ import Language.Rowling.Parser
 
 -- | Runs an evaluator with only the builtin bindings.
 runEval :: Eval a -> IO (a, EvalState)
-runEval = runEvalWith [def {_fEnvironment = Val <$> builtins}]
+runEval = runEvalWith [def {_fEnvironment = builtins}]
 
 -- | Runs an evaluator with the given frames as initial state.
 runEvalWith :: [EvalFrame] -> Eval a -> IO (a, EvalState)
@@ -41,8 +41,8 @@ evalExpr :: Expr -> IO Value
 evalExpr = evalWithBindings mempty
 
 -- | Evaluates an expression with the given bindings and builtins.
-evalWithBindings :: HashMap Name Value -> Expr -> IO Value
+evalWithBindings :: Record Value -> Expr -> IO Value
 evalWithBindings bindings expr = do
-  let baseFrame = def {_fEnvironment = Val <$> builtins}
-      startFrame = def {_fEnvironment = Val <$> bindings}
+  let baseFrame = def {_fEnvironment = builtins}
+      startFrame = def {_fEnvironment = bindings}
   fst <$> runEvalWith [startFrame, baseFrame] (eval expr)

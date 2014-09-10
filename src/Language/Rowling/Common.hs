@@ -23,7 +23,7 @@ module Language.Rowling.Common (
     module Data.Maybe,
     module GHC.Exts,
     module Text.Render,
-    Name, for, tuple
+    Name, Record, for, tuple
   ) where
 
 import ClassyPrelude hiding (assert, asList, find)
@@ -49,7 +49,11 @@ import qualified Data.Text as T
 import GHC.Exts (IsList)
 import Text.Render
 
+-- | Indicates that the text is some identifier.
 type Name = Text
+
+-- | A record is a lookup table with string keys.
+type Record = HashMap Name
 
 -- | Map reversed.
 for :: Functor f => f a -> (a -> b) -> f b

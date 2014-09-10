@@ -17,30 +17,33 @@ import Language.Rowling.Evaluator.Evaluator
 builtins :: HashMap Name Value
 builtins =
   [
-    ("+", builtinBinary "+" (+) (+)),
-    ("-", builtinBinary "-" (-) (-)),
-    ("*", builtinBinary "*" (*) (*)),
-    ("/", builtinBinary "/" div (/)),
-    (">", builtinBinaryComp ">" (>) (>)),
-    ("<", builtinBinaryComp "<" (<) (<)),
-    (">=", builtinBinaryComp ">=" (>=) (>=)),
-    ("<=", builtinBinaryComp "<=" (<=) (<=)),
-    ("==", builtinBinaryComp "==" (==) (==)),
-    ("!=", builtinBinaryComp "!=" (/=) (/=)),
-    ("&&", VBuiltin $ builtinBinaryBool "and" (&&)),
-    ("||", VBuiltin $ builtinBinaryBool "or" (||)),
+    ("+", builtinBinaryNum "+" (+) (+)),
+    ("-", builtinBinaryNum "-" (-) (-)),
+    ("*", builtinBinaryNum "*" (*) (*)),
+    ("/", builtinBinaryNum "/" div (/)),
+    (">", builtinBinaryNumComp ">" (>) (>)),
+    ("<", builtinBinaryNumComp "<" (<) (<)),
+    (">=", builtinBinaryNumComp ">=" (>=) (>=)),
+    ("<=", builtinBinaryNumComp "<=" (<=) (<=)),
+    ("==", builtinBinaryNumComp "==" (==) (==)),
+    ("!=", builtinBinaryNumComp "!=" (/=) (/=)),
+    ("&&", VBuiltin $ builtinBinaryNumBool "and" (&&)),
+    ("||", VBuiltin $ builtinBinaryNumBool "or" (||)),
     ("not", VBuiltin builtinNot),
     ("each", VBuiltin builtinEach)
   ]
 
--- | Shorthand for wrapping a builtin as a
+-- | Shorthand for wrapping a function as a builtin.
 bi :: Name -> (Value -> Eval Value) -> Value
 bi name = VBuiltin . Builtin name
 
-builtinBinary :: Name -> (Integer -> Integer -> Integer)
-                      -> (Double -> Double -> Double)
-                      -> Value
-builtinBinary name i2i f2f = bi name $ \case
+-- | Takes a numeric operator for integers and for doubles, and makes a
+-- builtin of it.
+builtinBinaryNum :: Name -- ^ The name of the builtin
+                 -> (Integer -> Integer -> Integer) -- ^ Integer operator
+                 -> (Double -> Double -> Double) -- ^ Floating point operator
+                 -> Value -- ^ A builtin value
+builtinBinaryNum name i2i f2f = bi name $ \case
   VInt n -> return $! builtinInt n
   VFloat f -> return $! builtinFloat f
   _ -> error "Not a number"
@@ -53,10 +56,10 @@ builtinBinary name i2i f2f = bi name $ \case
           VFloat f' -> return $ VFloat $ f `f2f` f'
           _ -> error "Not a number"
 
-builtinBinaryComp :: Name -> (Integer -> Integer -> Bool)
-                  -> (Double -> Double -> Bool)
-                  -> Value
-builtinBinaryComp name i2i f2f = bi name $ \case
+builtinBinaryNumComp :: Name -> (Integer -> Integer -> Bool)
+                     -> (Double -> Double -> Bool)
+                    b  -> Value
+builtinBinaryNumComp name i2i f2f = bi name $ \case
   VInt n -> return $ builtinInt n
   VFloat f -> return $ builtinFloat f
   _ -> error "Not a number"
@@ -69,8 +72,8 @@ builtinBinaryComp name i2i f2f = bi name $ \case
           VFloat f' -> return $ VBool $ f `f2f` f'
           _ -> error "Not a number"
 
-builtinBinaryBool :: Name -> (Bool -> Bool -> Bool) -> Builtin
-builtinBinaryBool name op = Builtin name $ \case
+builtinBinaryNumBool :: Name -> (Bool -> Bool -> Bool) -> Builtin
+builtinBinaryNumBool name op = Builtin name $ \case
   VBool b -> return $ bi (name <> "(" <> render b <> ")") $ \case
     VBool b' -> return $ VBool $ b `op` b'
     _ -> error "Not a bool"
@@ -83,7 +86,7 @@ builtinNot = Builtin "not" $ \case
 
 builtinEach :: Builtin
 builtinEach = Builtin "each" $ \case
-  VList vals -> return $! eachVals vals
+  VArray vals -> return $! eachVals vals
   _ -> error "Not a list"
   where
     eachVals vals = bi "eachApplied" $ \func -> do
@@ -91,4 +94,4 @@ builtinEach = Builtin "each" $ \case
             VClosure{..} -> undefined
             VBuiltin (Builtin _ builtin) -> builtin val
       results <- mapM applyFunc vals
-      return $ VList results
+      return $ VArray results

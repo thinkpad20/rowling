@@ -18,16 +18,16 @@ data Value = VInt Integer                  -- ^ An integer.
            | VFloat Double                 -- ^ A floating-point number.
            | VString Text                  -- ^ A string.
            | VBool Bool                    -- ^ A boolean.
-           | VList (Vector Value)          -- ^ A list of values.
+           | VArray (Vector Value)         -- ^ An array of values.
            | VTagged Name (Vector Value)
-           -- ^ A tagged union, like a Maybe.
+           -- ^ A tagged union, like `Either` or `List`.
            | VMaybe (Maybe Value)
            -- ^ A maybe (using the Haskell type for efficiency)
            | VBuiltin Builtin              -- ^ A builtin function.
-           | VRecord (HashMap Name Value)
-           -- ^ An instantiated Record (Model).
-           | VClosure {_cEnvironment :: EvalEnv,
-                       _cBody :: Expr}
+           | VRecord (Record Value) -- ^ An instantiated Record (Model).
+           | VClosure {_cEnvironment :: Record Value,
+                       _cPattern     :: Pattern,
+                       _cBody        :: Expr}
            -- ^ A function closure.
            deriving (Show, Eq)
 
@@ -46,15 +46,15 @@ instance IsString Value where
 
 instance IsList Value where
   type Item Value = Value
-  fromList = VList . GHC.fromList
-  toList (VList vs) = GHC.toList vs
+  fromList = VArray . GHC.fromList
+  toList (VArray vs) = GHC.toList vs
   toList _ = error "Not a list value"
 
 -- | Matches a pattern against a value and either fails, or returns a map of
 -- name bindings. For example, matching the pattern @Just x@ against the value
 -- @VTagged "Just" (VInt 1)@ would return @[("x", VInt 1)]@. Matching the
 -- same pattern against @VFloat 2.3@ would return @Nothing@.
-patternMatch :: Pattern -> Value -> Maybe (HashMap Name Value)
+patternMatch :: Pattern -> Value -> Maybe (Record Value)
 patternMatch p v = case (p, v) of
 -- Primitive literals just match if equal. (Constructors are literals).
   (Int n, VInt vn) | n == vn -> Just mempty
@@ -68,7 +68,7 @@ patternMatch p v = case (p, v) of
   -- A variable can match with anything.
   (Variable name, v) -> Just [(name, v)]
   -- With a list expression, it matches if and only if all of them match.
-  (List ps, VList vs) -> matchVector ps vs
+  (List ps, VArray vs) -> matchVector ps vs
   -- For a compound expression, dive into it (see below).
   (compoundExpr, VTagged n' vs) -> case dive compoundExpr of
     Just (n, ps) | n == n' -> matchVector (fromList ps) vs
@@ -97,12 +97,12 @@ patternMatch p v = case (p, v) of
 
 data EvalFrame = EvalFrame {
   _fArgument :: Value,
-  _fEnvironment :: EvalEnv
+  _fEnvironment :: Record Value
 } deriving (Show)
 
 instance KeyValueStore EvalFrame where
   type LookupKey EvalFrame = Name
-  type StoredValue EvalFrame = ValOrArg
+  type StoredValue EvalFrame = Value
   empty = def
   getValue name = lookup name . _fEnvironment
   putValue name val frame = frame {_fEnvironment = insertMap name val env}
@@ -126,12 +126,31 @@ instance Default EvalState where
 instance Default EvalFrame where
   def = EvalFrame {_fArgument = def, _fEnvironment = mempty}
 
+-- | The evaluator monad.
 type Eval = ReaderT () (StateT EvalState IO)
-type EvalEnv = HashMap Name ValOrArg
-data ValOrArg = Arg
-              | Val Value
-              | VDot ValOrArg Name
-              deriving (Show, Eq)
+
+-- | This is what environment variables map to. Because in closures, variables
+-- can point to indeterminate values (that won't be known until the function
+-- is called), we have essentially two options, literal values, or some
+-- reference into the argument of the function.
+--data ValOrArg = ArgRef ArgRef
+--              -- ^ An argument, or destructuring thereof.
+--              | Val Value
+--              --  ^ A literal value.
+--              deriving (Show, Eq)
+
+---- | A reference into the argument. For example, in the function @λx -> x.y@,
+---- we don't yet know the value of @x@, so we store the expression @x@ as
+---- mapping to `Arg`. Similarly, let's say we had the expression @λx -> let z
+---- = x.y; z@. Then when building the  would need to store the variable @z@
+--data ArgRef = Arg
+--            -- ^ The current argument in the frame.
+--            | ArgDot ArgRef Name
+--            -- ^ Getting some field out of an arg.
+--            | Deconstruct ArgRef Int
+--            -- ^ Getting the nth value in the structure.
+--            deriving (Show, Eq)
+
 
 data Builtin = Builtin Name (Value -> Eval Value)
 

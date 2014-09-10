@@ -39,7 +39,7 @@ spec = describe "evaluation" $ do
       evalExpr input `shouldBeM` output
 
   lambdaSpec
-
+  applicationSpec
   builtinSpec
 
   listsSpec
@@ -59,13 +59,15 @@ lambdaSpec = describe "lambdas" $ do
   it "should evaluate a lambda with no captures" $ do
     let input = idfunc
         output = VClosure {
-          _cEnvironment = [("x", Arg)],
+          _cEnvironment = [],
+          _cPattern = "x",
           _cBody = "x"
         }
     evalExpr input `shouldBeM` output
     let input = singlelist
         output = VClosure {
-          _cEnvironment = [("x", Arg)],
+          _cEnvironment = [],
+          _cPattern = "x",
           _cBody = ["x"]
         }
     evalExpr input `shouldBeM` output
@@ -73,7 +75,8 @@ lambdaSpec = describe "lambdas" $ do
   it "should evaluate a lambda with captures" $ do
     let input = capturingFunc
         output = VClosure {
-          _cEnvironment = [("x", Val $ VInt 3), ("y", Arg)],
+          _cEnvironment = [("x", VInt 3)],
+          _cPattern = "y",
           _cBody = Apply "y" "x"
         }
     evalExpr input `shouldBeM` output
@@ -81,14 +84,16 @@ lambdaSpec = describe "lambdas" $ do
   it "should evaluate nested lambdas" $ do
     let input1 = apply
         output1 = VClosure {
-          _cEnvironment = [("x", Arg)],
+          _cEnvironment = [],
+          _cPattern = "x",
           _cBody = Lambda "y" $ Apply "x" "y"
         }
     evalExpr input1 `shouldBeM` output1
 
     let input2 = weird
         output2 = VClosure {
-          _cEnvironment = [("x", Arg)],
+          _cEnvironment = [],
+          _cPattern = "x",
           _cBody = Let "y" "x" $ Lambda "z" $ Apply "z" "y"
         }
     evalExpr input2 `shouldBeM` output2
@@ -101,15 +106,17 @@ applicationSpec = describe "function application" $ do
     evalExpr input `shouldBeM` output
 
   it "should apply a nested lambda" $ do
+    -- (λx -> λy -> x y) (λx -> x)
     let input = Apply apply idfunc
         output = VClosure {
           _cEnvironment = [
-            ("x", Val $ VClosure {
-              _cEnvironment = [("x", Arg)],
+            ("x", VClosure {
+              _cEnvironment = [],
+              _cPattern = "x",
               _cBody = "x"
-            }),
-            ("y", Arg)
+            })
           ],
+          _cPattern = "y",
           _cBody = Apply "x" "y"
         }
     evalExpr input `shouldBeM` output
@@ -169,6 +176,32 @@ applicationSpec = describe "function application" $ do
 
       let input = (Apply (Lambda "x" [Float 2, "x"]) (Float 1))
           output = [VFloat 2, VFloat 1]
+      evalExpr input `shouldBeM` output
+
+  describe "pattern matching lambdas" $ do
+    it "should destructure its argument" $ do
+      -- (λ(Foo x) -> x + 1) (Foo 2)
+      let func = Lambda (Apply "Foo" "x") (binary "x" "+" (Int 1))
+          arg = Apply "Foo" (Int 2)
+          input = Apply func arg
+          output = VInt 3
+      evalExpr input `shouldBeM` output
+
+    it "should destructure nested arguments" $ do
+      -- (λ(Foo x (Bar y)) -> x + y) (Foo 2 (Bar 1))
+      let param = Apply (Apply "Foo" "x") (Apply "Bar" "y")
+          func = Lambda param (binary "x" "+" "y")
+          arg = Apply (Apply "Foo" (Int 2)) (Apply "Bar" (Int 1))
+          input = Apply func arg
+          output = VInt 3
+      evalExpr input `shouldBeM` output
+
+      -- (λ(Foo (Bar x) y) -> x + y) (Foo (Bar 1) 3)
+      let param = Apply (Apply "Foo" (Apply "Bar" "x")) "y"
+          func = Lambda param (binary "x" "+" "y")
+          arg = Apply (Apply "Foo" (Apply "Bar" (Int 1))) (Int 3)
+          input = Apply func arg
+          output = VInt 4
       evalExpr input `shouldBeM` output
 
 builtinSpec :: Spec
@@ -269,18 +302,18 @@ builtinSpec = describe "builtins" $ do
     it "should apply a function to each element of a list" $ do
       let list = List ["True", "True", "False"]
           input = Apply (Apply "each" list) "not"
-          output = VList [VBool False, VBool False, VBool True]
+          output = VArray [VBool False, VBool False, VBool True]
       evalExpr input `shouldBeM` output
 
 listsSpec :: Spec
 listsSpec = describe "lists" $ do
   it "should evaluate lists" $ do
     let nums = [1..10]
-    evalExpr (List $ map Int nums) `shouldBeM` VList $ map VInt nums
-    evalExpr (List $ map Float nums) `shouldBeM` VList $ map VFloat nums
+    evalExpr (List $ map Int nums) `shouldBeM` VArray $ map VInt nums
+    evalExpr (List $ map Float nums) `shouldBeM` VArray $ map VFloat nums
     let strs = ["hello", "hey", "hi"]
     evalExpr (List $ map String strs) `shouldBeM`
-      VList $ map VString strs
+      VArray $ map VString strs
 
 exampleEvaluations :: Spec
 exampleEvaluations = describe "example evaluations" $ do
