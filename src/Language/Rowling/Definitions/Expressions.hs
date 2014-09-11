@@ -20,6 +20,7 @@ data Expr = Int Integer -- ^ An integer literal.
           | Constructor Name -- ^ A constructor (e.g. @Just@, @False@, etc).
           | Typed Expr Type -- ^ An expression with annotated type.
           | Lambda Pattern Expr -- ^ A lambda expression.
+          | Case Expr [(Pattern, Expr)] -- ^ A case statement.
           | Let Name Expr Expr -- ^ A let expression.
           | Apply Expr Expr -- ^ An application.
           | Dot Expr Name -- ^ A field dereference.

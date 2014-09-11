@@ -41,8 +41,8 @@ spec = describe "evaluation" $ do
   lambdaSpec
   applicationSpec
   builtinSpec
-
   listsSpec
+  caseSpec
 
   exampleEvaluations
 
@@ -203,6 +203,24 @@ applicationSpec = describe "function application" $ do
           input = Apply func arg
           output = VInt 4
       evalExpr input `shouldBeM` output
+
+caseSpec :: Spec
+caseSpec = describe "case statements" $ do
+  it "should match appropriately" $ do
+    let input e = Case e [("x", "x")]
+    let exprs :: [Expr] -- type sig for type inference
+        exprs = [Int 1, Float 2, String "hey", binary (Int 1) "+" (Int 2)]
+    forM_ exprs $ \e -> do
+      v <- evalExpr e
+      evalExpr (input e) `shouldBeM` v
+
+  it "should destructure" $ do
+    let case_ e = Case e [(Apply "Just" "x", binary "x" "+" (Int 1)),
+                          ("Nothing", Int 0)]
+    evalExpr (case_ "Nothing") `shouldBeM` VInt 0
+    evalExpr (case_ (Apply "Just" (Int 2))) `shouldBeM` VInt 3
+  it "should error if nothing matches" $
+    pendingWith "Don't know how to assert an error"
 
 builtinSpec :: Spec
 builtinSpec = describe "builtins" $ do

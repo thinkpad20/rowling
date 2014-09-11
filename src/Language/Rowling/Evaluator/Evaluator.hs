@@ -39,6 +39,12 @@ eval !expr = case expr of
   Let var e1 e2 -> do
     modifyTopM . putValue var =<< eval e1
     eval e2
+  Case e alts -> eval e >>= go alts where
+    go [] v = errorC ["Pattern match failure: value ", render v,
+                      " does not match any of the given patterns"]
+    go ((pat, ex):rest) v = case patternMatch pat v of
+      Nothing -> go rest v
+      Just bs -> loadBindingsM bs >> eval ex
   Apply e1 e2 -> do
     arg <- eval e2
     eval e1 >>= \case
