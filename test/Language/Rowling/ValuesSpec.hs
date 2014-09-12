@@ -37,6 +37,27 @@ patternMatchSpec = describe "pattern matching" $ do
     matchWith ["a", Int 1] [VInt 0, VInt 1] [("a", VInt 0)]
     noMatch ["a", Int 1] [VInt 0, VInt 2]
 
+  describe "record patterns" $ do
+    it "should match when keys match" $ do
+      match (Record [("x", Int 1), ("y", Int 3)])
+            (VRecord [("x", VInt 1), ("y", VInt 3)])
+      matchWith (Record [("x", "a"), ("y", "b")])
+                (VRecord [("x", VInt 2), ("y", VFloat 5)])
+                [("a", VInt 2), ("b", VFloat 5)]
+
+    it "should match when there are extra keys in the value" $ do
+      match (Record [("x", Int 1), ("y", Int 3)])
+            (VRecord [("x", VInt 1), ("y", VInt 3), ("z", VInt 0)])
+      matchWith (Record [("x", "a"), ("y", "b")])
+                (VRecord [("x", VInt 2), ("y", VFloat 5), ("z", VInt 0)])
+                [("a", VInt 2), ("b", VFloat 5)]
+
+    it "should NOT match when there are extra keys in the pattern" $ do
+      noMatch (Record [("x", Int 1), ("y", Int 3)])
+              (VRecord [("x", VInt 2), ("y", VInt 3)])
+      noMatch (Record [("x", Int 1), ("y", Int 3)])
+              (VRecord [("x", VInt 2)])
+
   describe "haskell builtins" $ do
     it "should use haskell booleans" $ do
       match "True" (VBool True)

@@ -178,16 +178,6 @@ applicationSpec = describe "function application" $ do
           output = [VFloat 2, VFloat 1]
       evalExpr input `shouldBeM` output
 
-  --describe "pattern matching in lambdas" $ do
-  --  it "should destructure its argument" $ do
-  --    -- (λ(Foo x) -> x + 1) (Foo 2)
-  --    let func = Lambda "x" $ Case "x" [
-  --                 (Apply "Foo" "x", binary "x" "+" (Int 1))]
-  --        arg = Apply "Foo" (Int 2)
-  --        input = Apply func arg
-  --        output = VInt 3
-  --    evalExpr input `shouldBeM` output
-
 caseSpec :: Spec
 caseSpec = describe "case statements" $ do
   it "should match appropriately" $ do
@@ -211,15 +201,22 @@ caseSpec = describe "case statements" $ do
     -- (λ(Foo x (Bar y)) -> x + y) (Foo 2 (Bar 1))
     let pat = Apply (Apply "Foo" "x") (Apply "Bar" "y")
         input = case_ pat $ Apply (Apply "Foo" (Int 2)) (Apply "Bar" (Int 1))
-        output = VInt 3
-    evalExpr input `shouldBeM` output
+    evalExpr input `shouldBeM` VInt 3
 
   it "should destructure nested patterns on the left" $ do
     -- (λ(Foo (Bar x) y) -> x + y) (Foo (Bar 1) 3)
     let pat = Apply (Apply "Foo" (Apply "Bar" "x")) "y"
         input = case_ pat $ Apply (Apply "Foo" (Apply "Bar" (Int 1))) (Int 3)
-        output = VInt 4
-    evalExpr input `shouldBeM` output
+    evalExpr input `shouldBeM` VInt 4
+
+  it "should destructure lists" $ do
+    let input = case_ ["x", "y"] [Int 1, Int 2]
+    evalExpr input `shouldBeM` VInt 3
+
+  it "should destructure records" $ do
+    let expr = Record [("foo", Int 1), ("bar", Int 2)]
+        input = case_ (Record [("foo", "x"), ("bar", "y")]) expr
+    evalExpr input `shouldBeM` VInt 3
 
 builtinSpec :: Spec
 builtinSpec = describe "builtins" $ do

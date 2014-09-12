@@ -26,7 +26,8 @@ type Parser = ParsecT String ParserState Identity
 
 -- | Set of keywords.
 keywords :: Set Text
-keywords = S.fromList ["if", "then", "else", "true", "false", "let", "with"]
+keywords = S.fromList ["if", "then", "else", "is", "true", "false",
+                       "let", "with"]
 
 -- | Set of reserved symbols.
 keysymbols :: Set Text
@@ -225,10 +226,14 @@ pLet = Let <$> var <*> expr <*> rest where
 
 -- | An if statement.
 pIf :: Parser Expr
-pIf = If <$ keyword "if"    <*> pExpr
-         <* keyword "then"  <*> pExpr
-         <* keyword "else"  <*> pExpr
-
+pIf = keyword "if" >> do
+  cond <- pExpr
+  getIs cond <|> getThen cond
+  where
+    alts = tuple pBinary (keysymbol "->" *> pExpr) `sepBy1` schar '|'
+    getIs cond = map (Case cond) $ (keyword "is" *> alts)
+    getThen cond = If cond <$> (keyword "then" *> pExpr)
+                           <*> (keyword "else" *> pExpr)
 -- | An expression with a `.` and a field name.
 pDot :: Parser Expr
 pDot = pTerm >>= getNext where

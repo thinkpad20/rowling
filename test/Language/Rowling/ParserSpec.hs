@@ -102,6 +102,9 @@ applicationSpec = describe "applications" $ do
     parseIt "(a b) c" `shouldBeR` Apply (Apply "a" "b") "c"
     parseIt "a (b c)" `shouldBeR` Apply "a" (Apply "b" "c")
 
+  it "should be able to apply constructors" $ do
+    parseIt "Just 7" `shouldBeR` Apply "Just" (Int 7)
+
 ifSpec :: Spec
 ifSpec = describe "if statements" $ do
   it "should parse if statements" $ do
@@ -115,6 +118,16 @@ ifSpec = describe "if statements" $ do
     parseIt "if True then a else if False then b else c" `shouldBeR` output
     let output = If (If "True" "a" "b") "c" "d"
     parseIt "if if True then a else b then c else d" `shouldBeR` output
+
+  it "should parse cases statements" $ do
+    let output = Case "x" [(Int 1, Float 2), (Int 2, Float 0)]
+    parseIt "if x is 1 -> 2.0 | 2 -> 0.0" `shouldBeR` output
+
+    let input = "if x * 3 is 5 -> 0 | Just 7 -> 1 | foo -> foo"
+        output = Case (binary "x" "*" (Int 3)) [(Int 5, Int 0),
+                                                (Apply "Just" (Int 7), Int 1),
+                                                ("foo", "foo")]
+    parseIt input `shouldBeR` output
 
 binarySpec :: Spec
 binarySpec = describe "binary operations" $ do

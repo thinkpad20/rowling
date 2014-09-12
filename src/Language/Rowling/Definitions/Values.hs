@@ -69,6 +69,7 @@ patternMatch p v = case (p, v) of
   (Variable name, v) -> Just [(name, v)]
   -- With a list expression, it matches if and only if all of them match.
   (List ps, VArray vs) -> matchVector ps vs
+  (Record precord, VRecord vrecord) -> matchRecord precord vrecord
   -- For a compound expression, dive into it (see below).
   (compoundExpr, VTagged n' vs) -> case dive compoundExpr of
     Just (n, ps) | n == n' -> matchVector (fromList ps) vs
@@ -76,6 +77,15 @@ patternMatch p v = case (p, v) of
   -- Anything else is not a match.
   otherwise -> Nothing
   where
+    matchRecord precord vrecord = loop mempty $ H.toList precord where
+      loop bindings [] = Just bindings
+      loop bindings ((key, pattern):rest) = case lookup key vrecord of
+        -- Key doesn't exist, pattern match fails.
+        Nothing -> Nothing
+        Just val -> case patternMatch pattern val of
+          -- Value doesn't pattern match with pattern, no match.
+          Nothing -> Nothing
+          Just bindings' -> loop (bindings' <> bindings) rest
     matchVector ps vs = case length ps == length vs of
       True -> concat <$> mapM (uncurry patternMatch) (zip ps vs)
       False -> Nothing
