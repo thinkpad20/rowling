@@ -4,7 +4,7 @@
              FunctionalDependencies, FlexibleInstances #-}
 module Language.Rowling.TypeCheck.TypeChecker (
   module Language.Rowling.Definitions.Types,
-  typeIt, typeIt', loadParam, typeWithContext, typeExpr, typeExprN
+  typeIt, typeIt', loadPattern, typeWithContext, typeExpr, typeExprN
   ) where
 
 import qualified Prelude as P
@@ -181,10 +181,11 @@ typeOf expr = go expr `catchError` whenTyping where
     Variable name -> findOrError' name >>= instantiate >>= only where
       findOrError' = findOrError $
         ErrorList ["No variable '", name, "' in scope"]
-    Lambda param body -> withFrame mempty $ do
-      (paramT, paramS) <- loadParam param
+    Lambda name body -> withFrame mempty $ do
+      paramT <- newvar
+      store name $ polytype paramT
       (bodyT, bodyS) <- typeOf body
-      applyAndReturn (paramT ==> bodyT) (paramS • bodyS)
+      applyAndReturn (paramT ==> bodyT) bodyS
     Apply e1 e2 -> do
       (t1, s1) <- typeOf' e1
       (t2, s2) <- typeOf e2
@@ -253,8 +254,8 @@ only t = return (t, noSubs)
 
 -- | Loads new bindings from a pattern. So a variable doesn't get looked up;
 -- rather it gets added as a new variable to the scope.
-loadParam :: Expr -> TypeChecker (Type, Substitution)
-loadParam = \case
+loadPattern :: Expr -> TypeChecker (Type, Substitution)
+loadPattern = \case
   Variable name -> do var <- newvar
                       store name $ polytype var
                       only var
@@ -264,11 +265,11 @@ loadParam = \case
     return (TRecord fieldTypes (Just rest), subs)
     where go :: Expr -> StateT Substitution TypeChecker Type
           go expr = do
-            (t, subs) <- lift $ loadParam expr
+            (t, subs) <- lift $ loadPattern expr
             modify (subs •)
             return t
 
-  Typed expr t -> do (t', s) <- loadParam expr
+  Typed expr t -> do (t', s) <- loadPattern expr
                      s' <- unify t' t
                      applyAndReturn t (s • s')
   p -> throwErrorC ["Invalid lambda argument: ", render p]

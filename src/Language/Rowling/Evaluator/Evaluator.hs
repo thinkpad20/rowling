@@ -35,13 +35,15 @@ eval !expr = case expr of
   Typed expr _ -> eval expr
   Lambda param body -> do
     env <- getClosure expr
-    return $ VClosure env param body
+    return $ VClosure env (Variable param) body
   Let var e1 e2 -> do
     modifyTopM . putValue var =<< eval e1
     eval e2
   Case e alts -> eval e >>= go alts where
+    ps = fst <$> alts
     go [] v = errorC ["Pattern match failure: value ", render v,
-                      " does not match any of the given patterns"]
+                      " does not match any of the given patterns: ",
+                      render ps]
     go ((pat, ex):rest) v = case patternMatch pat v of
       Nothing -> go rest v
       Just bs -> loadBindingsM bs >> eval ex
@@ -77,15 +79,18 @@ getClosure = flip evalStateT [] . loop where
     True -> return mempty
     False -> do val <- lift $ findOrHardError name
                 return [(name, val)]
-  loop !(Lambda param body) = withNames (getNames param) $ loop body
-  loop !(Let name e1 e2) = withNames (S.singleton name) $ loop2 e1 e2
+  loop !(Lambda param body) = withName param $ loop body
+  loop !(Let name e1 e2) = withName name $ loop2 e1 e2
   loop !(Apply e1 e2) = loop2 e1 e2
   loop !(Record fields) = foldl' (<>) mempty <$> mapM loop fields
   loop !(Typed e _) = loop e
   loop !(Dot e _) = loop e
+  loop !(Case e alts) = map concat $ mapM go alts where
+    go (p, e) = withNames (getNames p) (loop e)
   loop _ = return mempty
   loop2 a b = mappend <$> loop a <*> loop b
   withNames names action = modify (names :) *> action <* modify P.tail
+  withName n = withNames (S.singleton n)
   isBound name = get >>= look where
     look [] = return False
     look (names:rest) = if S.member name names then return True else look rest

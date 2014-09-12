@@ -19,7 +19,7 @@ data Expr = Int Integer -- ^ An integer literal.
           | Variable Name -- ^ A variable.
           | Constructor Name -- ^ A constructor (e.g. @Just@, @False@, etc).
           | Typed Expr Type -- ^ An expression with annotated type.
-          | Lambda Pattern Expr -- ^ A lambda expression.
+          | Lambda Name Expr -- ^ A lambda expression.
           | Case Expr [(Pattern, Expr)] -- ^ A case statement.
           | Let Name Expr Expr -- ^ A let expression.
           | Apply Expr Expr -- ^ An application.
@@ -56,7 +56,7 @@ instance Render Expr where
     Constructor name -> name
     Variable name -> name
     Typed expr typ -> render expr <> " :: " <> render typ
-    Lambda e1 e2 -> "λ" <> renderParens e1 <> " -> " <> render e2
+    Lambda name e2 -> "λ" <> name <> " -> " <> render e2
     Let name e1 e2 -> "let " <> name <> " = " <> render e1 <> "; " <> render e2
     Apply (Apply (Variable name) e1) e2 | isOp name ->
       renderParens e1 <> " " <> name <> " " <> renderParens e2

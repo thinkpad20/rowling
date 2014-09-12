@@ -242,10 +242,11 @@ pApply = pDot `chainl1` (pure Apply)
 
 -- | A lambda expression.
 pLambda :: Parser Expr
-pLambda = Lambda <$> param <*> body where
-  param = schar '&' *> pattern
-  body = keysymbol "->" *> pExpr
-  pattern = pVariable <|> pParens
+pLambda = schar '&' >> do
+  let alt = tuple pTerm (keysymbol "->" *> pExpr)
+  alt `sepBy1` schar '|' >>= \case
+    [(Variable name, body)] -> return $ Lambda name body
+    alts -> return $ Lambda "x" $ Case "x" alts
 
 -- | Two expressions joined by a binary operator.
 pBinary :: Parser Expr

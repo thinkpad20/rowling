@@ -178,31 +178,15 @@ applicationSpec = describe "function application" $ do
           output = [VFloat 2, VFloat 1]
       evalExpr input `shouldBeM` output
 
-  describe "pattern matching lambdas" $ do
-    it "should destructure its argument" $ do
-      -- (λ(Foo x) -> x + 1) (Foo 2)
-      let func = Lambda (Apply "Foo" "x") (binary "x" "+" (Int 1))
-          arg = Apply "Foo" (Int 2)
-          input = Apply func arg
-          output = VInt 3
-      evalExpr input `shouldBeM` output
-
-    it "should destructure nested arguments" $ do
-      -- (λ(Foo x (Bar y)) -> x + y) (Foo 2 (Bar 1))
-      let param = Apply (Apply "Foo" "x") (Apply "Bar" "y")
-          func = Lambda param (binary "x" "+" "y")
-          arg = Apply (Apply "Foo" (Int 2)) (Apply "Bar" (Int 1))
-          input = Apply func arg
-          output = VInt 3
-      evalExpr input `shouldBeM` output
-
-      -- (λ(Foo (Bar x) y) -> x + y) (Foo (Bar 1) 3)
-      let param = Apply (Apply "Foo" (Apply "Bar" "x")) "y"
-          func = Lambda param (binary "x" "+" "y")
-          arg = Apply (Apply "Foo" (Apply "Bar" (Int 1))) (Int 3)
-          input = Apply func arg
-          output = VInt 4
-      evalExpr input `shouldBeM` output
+  --describe "pattern matching in lambdas" $ do
+  --  it "should destructure its argument" $ do
+  --    -- (λ(Foo x) -> x + 1) (Foo 2)
+  --    let func = Lambda "x" $ Case "x" [
+  --                 (Apply "Foo" "x", binary "x" "+" (Int 1))]
+  --        arg = Apply "Foo" (Int 2)
+  --        input = Apply func arg
+  --        output = VInt 3
+  --    evalExpr input `shouldBeM` output
 
 caseSpec :: Spec
 caseSpec = describe "case statements" $ do
@@ -221,6 +205,21 @@ caseSpec = describe "case statements" $ do
     evalExpr (case_ (Apply "Just" (Int 2))) `shouldBeM` VInt 3
   it "should error if nothing matches" $
     pendingWith "Don't know how to assert an error"
+
+  let case_ pattern z = Case z [(pattern, binary "x" "+" "y")]
+  it "should destructure nested patterns on the right" $ do
+    -- (λ(Foo x (Bar y)) -> x + y) (Foo 2 (Bar 1))
+    let pat = Apply (Apply "Foo" "x") (Apply "Bar" "y")
+        input = case_ pat $ Apply (Apply "Foo" (Int 2)) (Apply "Bar" (Int 1))
+        output = VInt 3
+    evalExpr input `shouldBeM` output
+
+  it "should destructure nested patterns on the left" $ do
+    -- (λ(Foo (Bar x) y) -> x + y) (Foo (Bar 1) 3)
+    let pat = Apply (Apply "Foo" (Apply "Bar" "x")) "y"
+        input = case_ pat $ Apply (Apply "Foo" (Apply "Bar" (Int 1))) (Int 3)
+        output = VInt 4
+    evalExpr input `shouldBeM` output
 
 builtinSpec :: Spec
 builtinSpec = describe "builtins" $ do

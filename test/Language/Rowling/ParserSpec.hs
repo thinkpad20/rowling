@@ -59,6 +59,10 @@ lambdasSpec = describe "lambdas" $ do
     let output = Lambda "x" $ Let "y" "x" (Lambda "z" $ Apply "z" "y")
     parseIt "&x -> let y = x; &z -> z y" `shouldBeR` output
 
+  it "should parse a lambda with a pattern" $ do
+    let output = Lambda "x" $ Case "x" [(Int 1, Int 2)]
+    parseIt "&1 -> 2" `shouldBeR` output
+
 letSpec :: Spec
 letSpec = describe "let statements" $ do
   it "should parse a let statement" $ do
