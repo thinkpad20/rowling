@@ -107,3 +107,8 @@ binary e1 op e2 = Apply (Apply (Variable op) e1) e2
 -- | Tests if the string is an operator (symbol).
 isOp :: Text -> Bool
 isOp = T.all (`S.member` (S.fromList symChars))
+
+-- | "Unrolls" an application into its left-most function and its arguments.
+unroll :: Expr -> (Expr, [Expr])
+unroll (Apply a b) = let (f, xs) = unroll a in (f, xs `snoc` b)
+unroll e = (e, [])

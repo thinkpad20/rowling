@@ -72,6 +72,59 @@ letSpec = describe "let statements" $ do
     let output = Let "x" "y" $ Let "z" "w" $ Int 3
     parseIt "let x = y; let z = w; 3" `shouldBeR` output
 
+  it "should parse function declarations" $ do
+    let output = Let "f" (Lambda "x" (binary "x" "+" (Int 3))) "f"
+    parseIt "let f x = x + 3; f" `shouldBeR` output
+
+  it "should parse function declarations with multiple args" $ do
+    let output = Let "f" (Lambda "x" (Lambda "y" (binary "x" "+" "y"))) "f"
+    parseIt "let f x y = x + y; f" `shouldBeR` output
+
+  it "should parse function declarations with patterns" $ do
+    let output = Let "f" (Lambda "a" (Case "a" [(Int 1, Int 2)])) "f"
+    parseIt "let f 1 = 2; f" `shouldBeR` output
+
+  it "should parse function declarations with multiple patterns" $ do
+    let body = Case "a" [(Int 1, Int 2), ("y", binary "y" "+" (Int 3))]
+    let output = Let "f" (Lambda "a" body) "f"
+    parseIt "let f 1 = 2 | f y = y + 3; f" `shouldBeR` output
+
+  it "should parse function declarations with multiple args/patterns" $ do
+    let input = "let f 1 2 = 0 | f x y = x + y; f"
+    -- This desugars to:
+    -- let f a b = if [a, b] is [1, 2] -> 0 | [x, y] -> [x + y]; f
+        body = Case ["a", "b"] [([Int 1, Int 2], Int 0),
+                                (["x", "y"], binary "x" "+" "y")]
+        output = Let "f" (Lambda "a" $ Lambda "b" body) "f"
+    parseIt input `shouldBeR` output
+
+  it "should parse symbol function declarations" $ do
+    let input = "let x +-+ y = x * (y + x); 0"
+        output = Let "+-+" (Lambda "x" $ Lambda "y" $
+                             binary "x" "*" (binary "y" "+" "x")) (Int 0)
+    parseIt input `shouldBeR` output
+
+  it "should parse symbol function declarations with multiple patterns" $ do
+    let input = "let 1 +-+ 0 = 1 | x +-+ y = x * y; 0"
+        body = Case ["a", "b"] [([Int 1, Int 0], Int 1),
+                                (["x", "y"], binary "x" "*" "y")]
+        output = Let "+-+" (Lambda "a" $ Lambda "b" body) (Int 0)
+    parseIt input `shouldBeR` output
+
+  it "should fail if the wrong function name is used" $ do
+    let input = "let foo 0 = 1 | bar 1 = 2; baz"
+    parseIt input `shouldHaveErr` "Expected function named \"foo\""
+
+  it "should fail if the wrong number of arguments is used" $ do
+    let input = "let foo 0 = 1 | foo 1 2 = 3; baz"
+    parseIt input `shouldHaveErr` "Wrong number of arguments, expected 1"
+
+  it "should fail if adding patterns to function with all variables" $ do
+    let input = "let foo x = 1 | foo y = 2; foo"
+    parseIt input `shouldHaveErr` "unexpected"
+    let input = "let foo = 1 | foo = 2; foo"
+    parseIt input `shouldHaveErr` "unexpected"
+
 recordsSpec :: Spec
 recordsSpec = describe "records" $ do
   it "should parse records" $ do

@@ -219,10 +219,72 @@ makeTuple es = map (\(i, e) -> (render i, e)) $ zip [0 :: Int ..] es
 
 -- | A let statement.
 pLet :: Parser Expr
-pLet = Let <$> var <*> expr <*> rest where
-  var = keyword "let" *> identifier <* schar '='
-  expr = pExpr <* schar ';'
-  rest = pExpr
+pLet = keyword "let" >> do
+  expr <- pBinary
+  body <- schar '=' *> pExpr
+  case unroll expr of
+    -- A single, pattern argument; this is a deconstruction. For example,
+    -- we can rewrite `let Just x = y; z` as `if z is Just x -> y`.
+    (x, _) | not (isVariable x) -> do
+      y <- rest
+      return $ Case body [(expr, y)]
+    -- A variable on the left means this is a variable definition.
+    (Variable name, args) ->
+      if all isVariable args then do
+        -- If all of the arguments are also variables, or if there are no
+        -- arguments, then we can just use a simple fold to make a lambda.
+        -- This also covers the no-argument case.
+        let names = map (\(Variable v) -> v) args
+        Let name (foldr Lambda body names) <$> rest
+      else do
+        -- If there are restrictions in the arguments, then we need to
+        -- construct a case statement. And there might be multiple patterns.
+        -- So use `getOthers` to collect them.
+        let numArgs = length args
+        others <- option [] $ schar '|' *> getOthers name numArgs
+        -- Our full alternatives list is the original pattern and body joined
+        -- onto the others.
+        let alts = (toPattern args, body) : others
+        -- Create a names list, one for each argument.
+        let params = take numArgs $ map singleton ['a'..]
+            finalBody = Case (toPattern $ map Variable params) alts
+        Let name (foldr Lambda finalBody params) <$> rest
+  where rest = schar ';' *> pExpr
+        isVariable (Variable _) = True
+        isVariable _ = False
+
+-- | Converts multiple patterns into a single pattern, using a list if there
+-- is not exactly one element in the argument.
+toPattern :: [Pattern] -> Pattern
+toPattern exprs = case exprs of [p] -> p; _ -> List $ fromList exprs
+
+-- | Gets additional alternatives. After grabbing a single function
+-- definition, there can be 0 or more additional alternatives for this
+-- function. For example:
+-- >>> let fact 1 = 0 | fact n = n * fact (n - 1);
+-- In this case, the number of arguments would be 1, and the function name
+-- would be @fact@.
+getOthers :: Name -- * The name of the function.
+          -> Int -- * The number of arguments to grab (must be same each time)
+          -> Parser [(Pattern, Expr)] -- * A list of alternatives.
+getOthers funcName numArgs = do
+  -- Get the pattern on the left side.
+  pattern <- unroll <$> pBinary >>= \case
+    (Variable f, es) -> do
+      -- Make sure the function name matches.
+      when (f /= funcName) $ do
+        unexpected $ "Expected function named " <> show funcName
+      -- Make sure the same number of arguments have been declared.
+      when (length es /= numArgs) $ do
+        unexpected $ "Wrong number of arguments, expected " <> show numArgs
+      return $ toPattern es
+  -- Get the definition.
+  body <- schar '=' *> pExpr
+  -- Continue if there's a pipe.
+  option [(pattern, body)] $ schar '|' >> do
+    ((pattern, body):) <$> getOthers funcName numArgs
+
+
 
 -- | An if statement.
 pIf :: Parser Expr
