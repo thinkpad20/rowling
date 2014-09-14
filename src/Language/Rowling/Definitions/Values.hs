@@ -4,33 +4,37 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+-- | Describes Rowling values, i.e., the entities which are produced by
+-- evaluating expressions, and passed as input to the evaluator.
 module Language.Rowling.Definitions.Values where
 
+import Data.Aeson (FromJSON(..), ToJSON(..), (.=), object)
+import qualified Data.Aeson as Aeson
 import Data.ContextStack
+import qualified Data.HashMap.Strict as H
+import Data.Scientific (isInteger, toRealFloat, fromFloatDigits)
 import qualified GHC.Exts as GHC
 
 import Language.Rowling.Common
 import Language.Rowling.Definitions.Expressions
-import qualified Data.HashMap.Strict as H
 
 -- | The evaluated form of an `Expr`.
-data Value = VInt Integer                  -- ^ An integer.
-           | VFloat Double                 -- ^ A floating-point number.
-           | VString Text                  -- ^ A string.
-           | VBool Bool                    -- ^ A boolean.
-           | VArray (Vector Value)         -- ^ An array of values.
-           | VTagged Name (Vector Value)
+data Value = VInt !Integer                  -- ^ An integer.
+           | VFloat !Double                 -- ^ A floating-point number.
+           | VString !Text                  -- ^ A string.
+           | VBool !Bool                    -- ^ A boolean.
+           | VArray !(Vector Value)         -- ^ An array of values.
+           | VTagged !Name !(Vector Value)
            -- ^ A tagged union, like `Either` or `List`.
-           | VMaybe (Maybe Value)
+           | VMaybe !(Maybe Value)
            -- ^ A maybe (using the Haskell type for efficiency)
-           | VBuiltin Builtin              -- ^ A builtin function.
-           | VRecord (Record Value) -- ^ An instantiated Record (Model).
-           | VClosure {_cEnvironment :: Record Value,
-                       _cPattern     :: Pattern,
-                       _cBody        :: Expr}
-           -- ^ A function closure.
+           | VBuiltin !Builtin              -- ^ A builtin function.
+           | VRecord !(Record Value) -- ^ An instantiated Record.
+           | VClosure !(Record Value) !Pattern !Expr -- ^ A closure.
            deriving (Show, Eq)
 
+-- | Looks up a field in a record. If the field doesn't exist, or the value
+-- isn't a record, an IO exception will be thrown.
 deref :: Name -> Value -> Value
 deref name (VRecord fields) = case H.lookup name fields of
   Nothing -> error $ "No field " <> show name
@@ -38,17 +42,52 @@ deref name (VRecord fields) = case H.lookup name fields of
 deref _ _ = error "Not a record value"
 
 instance Render Value
+
+-- | The default value is an empty record, akin to @()@.
 instance Default Value where
   def = VRecord mempty
 
+-- | Makes creating string values more convenient.
 instance IsString Value where
   fromString = VString . fromString
 
+-- | Array values are lists, that contain values.
 instance IsList Value where
   type Item Value = Value
   fromList = VArray . GHC.fromList
   toList (VArray vs) = GHC.toList vs
   toList _ = error "Not a list value"
+
+-- | Values can be read out of JSON. Of course, closures and builtins
+-- can't be represented.
+instance FromJSON Value where
+  parseJSON (Aeson.Object v) = VRecord <$> mapM parseJSON v
+  parseJSON (Aeson.Array arr) = VArray <$> mapM parseJSON arr
+  parseJSON (Aeson.String s) = return $ VString s
+  parseJSON (Aeson.Bool b) = return $ VBool b
+  parseJSON (Aeson.Number n)
+    | isInteger n = return $ VInt (floor n)
+    | otherwise   = return $ VFloat $ toRealFloat n
+  parseJSON _ = mzero
+
+
+-- | Most values have JSON representations. Where they don't, it's an error
+-- to try to serialize them to JSON.
+instance ToJSON Value where
+  toJSON (VInt i) = Aeson.Number $ fromIntegral i
+  toJSON (VFloat f) = Aeson.Number $ fromFloatDigits f
+  toJSON (VString txt) = Aeson.String txt
+  toJSON (VBool b) = Aeson.Bool b
+  toJSON (VArray arr) = Aeson.Array $ map toJSON arr
+  toJSON (VMaybe Nothing) = object ["@constructor" .= Aeson.String "None"]
+  toJSON (VMaybe (Just v)) = object [
+    "@constructor" .= Aeson.String "Some",
+    "@values" .= Aeson.Array [toJSON v]
+    ]
+  toJSON (VTagged name vals) = object ["@constructor" .= name,
+                                       "@values" .= map toJSON vals]
+  toJSON (VRecord rec) = Aeson.Object $ map toJSON rec
+  toJSON v = errorC ["Can't serialize '", render v, "' to JSON"]
 
 -- | Matches a pattern against a value and either fails, or returns a map of
 -- name bindings. For example, matching the pattern @Just x@ against the value
@@ -60,7 +99,7 @@ patternMatch p v = case (p, v) of
   (Int n, VInt vn) | n == vn -> Just mempty
   (Float n, VFloat vn) | n == vn -> Just mempty
   (String (Plain s), VString vs) | s == vs -> Just mempty
-  -- | True and false are constructors
+  -- True and false are constructors, but use Haskell bools
   (Constructor "True", VBool True) -> Just mempty
   (Constructor "False", VBool False) -> Just mempty
   (Constructor "None", VMaybe Nothing) -> Just mempty
@@ -98,18 +137,22 @@ patternMatch p v = case (p, v) of
       dive' (Apply p1 p2) = for (dive' p1) (\(name, ps) -> (name, p2:ps))
       dive' _ = Nothing
 
-
 ------------------------------------------------------------------------------
 -- * The Evaluator Monad
 -- Note: we have to put these definitions here because `Value`s need to be
 -- aware of the `Eval` type.
 ------------------------------------------------------------------------------
 
+-- | An evaluation frame. It consists of the argument passed into the
+-- function currently being evaluated, and all of the variables in the
+-- current scope.
 data EvalFrame = EvalFrame {
   _fArgument :: Value,
   _fEnvironment :: Record Value
 } deriving (Show)
 
+-- | A frame is a key-value store where the internal dictionary is the
+-- environment.
 instance KeyValueStore EvalFrame where
   type LookupKey EvalFrame = Name
   type StoredValue EvalFrame = Value
@@ -119,6 +162,7 @@ instance KeyValueStore EvalFrame where
   putValue name val frame = frame {_fEnvironment = insertMap name val env}
     where env = _fEnvironment frame
 
+-- | The evaluator's state is a stack of evaluation frames.
 data EvalState = EvalState {_esStack :: [EvalFrame]} deriving (Show)
 
 -- | The evaluator state is a stack of `EvalFrame`s.
@@ -131,42 +175,26 @@ instance Stack EvalState where
   modifyTop func state = state {_esStack=func top : rest} where
     top:rest = _esStack state
 
+-- | The default evaluation state is a stack with a single evaluation frame.
 instance Default EvalState where
   def = EvalState {_esStack = [def]}
 
+-- | The default evaluation frame just takes default arguments and
+-- environment.
 instance Default EvalFrame where
   def = EvalFrame {_fArgument = def, _fEnvironment = mempty}
 
 -- | The evaluator monad.
 type Eval = ReaderT () (StateT EvalState IO)
 
--- | This is what environment variables map to. Because in closures, variables
--- can point to indeterminate values (that won't be known until the function
--- is called), we have essentially two options, literal values, or some
--- reference into the argument of the function.
---data ValOrArg = ArgRef ArgRef
---              -- ^ An argument, or destructuring thereof.
---              | Val Value
---              --  ^ A literal value.
---              deriving (Show, Eq)
-
----- | A reference into the argument. For example, in the function @λx -> x.y@,
----- we don't yet know the value of @x@, so we store the expression @x@ as
----- mapping to `Arg`. Similarly, let's say we had the expression @λx -> let z
----- = x.y; z@. Then when building the  would need to store the variable @z@
---data ArgRef = Arg
---            -- ^ The current argument in the frame.
---            | ArgDot ArgRef Name
---            -- ^ Getting some field out of an arg.
---            | Deconstruct ArgRef Int
---            -- ^ Getting the nth value in the structure.
---            deriving (Show, Eq)
-
-
+-- | A built-in function. Allows us to write functions in Haskell and
+-- make them callable from inside the Rowling evaluator.
 data Builtin = Builtin Name (Value -> Eval Value)
 
+-- | All we show is the function's name, which is assumed to be unique.
 instance Show Builtin where
-  show (Builtin n _) = unpack n <> "(builtin function)"
+  show (Builtin n _) = "<BUILTIN " <> show n <> ">"
 
+-- | Builtins are considered equal if they have the same name.
 instance Eq Builtin where
   Builtin n1 _ == Builtin n2 _ = n1 == n2

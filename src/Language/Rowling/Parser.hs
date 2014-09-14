@@ -264,9 +264,9 @@ toPattern exprs = case exprs of [p] -> p; _ -> List $ fromList exprs
 -- >>> let fact 1 = 0 | fact n = n * fact (n - 1);
 -- In this case, the number of arguments would be 1, and the function name
 -- would be @fact@.
-getOthers :: Name -- * The name of the function.
-          -> Int -- * The number of arguments to grab (must be same each time)
-          -> Parser [(Pattern, Expr)] -- * A list of alternatives.
+getOthers :: Name -- ^ The name of the function.
+          -> Int -- ^ The number of arguments to grab (must be same each time)
+          -> Parser [(Pattern, Expr)] -- ^ A list of alternatives.
 getOthers funcName numArgs = do
   -- Get the pattern on the left side.
   pattern <- unroll <$> pBinary >>= \case

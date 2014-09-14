@@ -179,7 +179,6 @@ instance CanApply Polytype where
 -- | The function type, which is actually a rank-2 type applied twice.
 (==>) :: (IsString a, CanApply a) => a -> a -> a
 t1 ==> t2 = apply (apply "->" t1) t2
-
 infixr 3 ==>
 
 -- | Creates a polytype out of a type. Somewhat hacky.

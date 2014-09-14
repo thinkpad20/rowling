@@ -25,7 +25,7 @@ data Expr = Int Integer -- ^ An integer literal.
           | Apply Expr Expr -- ^ An application.
           | Dot Expr Name -- ^ A field dereference.
           | List (Vector Expr) -- ^ A list literal.
-          | Record (HashMap Name Expr) -- ^ A record literal.
+          | Record (Record Expr) -- ^ A record literal.
           | If Expr Expr Expr -- ^ A conditional expression.
           deriving (Show, Eq)
 
@@ -68,6 +68,10 @@ instance Render Expr where
       joinNE (name, expr) = name <> ": " <> render expr
     List es -> "[" <> T.intercalate ", " renderedList <> "]" where
       renderedList = toList $ map render es
+    Case e alts -> "if " <> render e <> " is " <> showAlts where
+      showAlts = T.intercalate " | " $ map showAlt alts
+      showAlt (p, e) = render p <> " -> " <> render e
+    e -> pack $ show e
   renderParens e = case e of
     Apply _ _ -> parens
     Typed _ _ -> parens
@@ -112,3 +116,23 @@ isOp = T.all (`S.member` (S.fromList symChars))
 unroll :: Expr -> (Expr, [Expr])
 unroll (Apply a b) = let (f, xs) = unroll a in (f, xs `snoc` b)
 unroll e = (e, [])
+
+
+instance FreeVars Interp where
+  freevars (Interp i1 e i2) = freevars i1 <> freevars e <> freevars i2
+  freevars _ = mempty
+
+instance FreeVars Expr where
+  freevars = \case
+    Variable name -> S.singleton name
+    String interp -> freevars interp
+    Typed e _ -> freevars e
+    Lambda name e -> S.delete name $ freevars e
+    Case e alts -> freevars e <> freeAlts where
+      freeAlts = concatMap (\(p, e) -> freevars e \\ freevars p) alts
+    Let name e1 e2 -> freevars e1 <> (S.delete name $ freevars e2)
+    Apply e1 e2 -> freevars e1 <> freevars e2
+    Dot e _ -> freevars e
+    List es -> concatMap freevars es
+    Record es -> concatMap freevars es
+    If e1 e2 e3 -> freevars e1 <> freevars e2 <> freevars e3

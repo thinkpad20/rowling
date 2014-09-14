@@ -5,7 +5,6 @@
 module Language.Rowling.EvaluatorSpec (main, spec) where
 
 import SpecHelper
-import ClassyPrelude
 import Language.Rowling.Definitions.Expressions
 import Language.Rowling.Definitions.Values
 import Language.Rowling.Evaluator
@@ -58,44 +57,24 @@ lambdaSpec :: Spec
 lambdaSpec = describe "lambdas" $ do
   it "should evaluate a lambda with no captures" $ do
     let input = idfunc
-        output = VClosure {
-          _cEnvironment = [],
-          _cPattern = "x",
-          _cBody = "x"
-        }
+        output = VClosure [] "x" "x"
     evalExpr input `shouldBeM` output
     let input = singlelist
-        output = VClosure {
-          _cEnvironment = [],
-          _cPattern = "x",
-          _cBody = ["x"]
-        }
+        output = VClosure [] "x" ["x"]
     evalExpr input `shouldBeM` output
 
   it "should evaluate a lambda with captures" $ do
     let input = capturingFunc
-        output = VClosure {
-          _cEnvironment = [("x", VInt 3)],
-          _cPattern = "y",
-          _cBody = Apply "y" "x"
-        }
+        output = VClosure [("x", VInt 3)] "y" (Apply "y" "x")
     evalExpr input `shouldBeM` output
 
   it "should evaluate nested lambdas" $ do
     let input1 = apply
-        output1 = VClosure {
-          _cEnvironment = [],
-          _cPattern = "x",
-          _cBody = Lambda "y" $ Apply "x" "y"
-        }
+        output1 = VClosure [] "x" (Lambda "y" $ Apply "x" "y")
     evalExpr input1 `shouldBeM` output1
 
     let input2 = weird
-        output2 = VClosure {
-          _cEnvironment = [],
-          _cPattern = "x",
-          _cBody = Let "y" "x" $ Lambda "z" $ Apply "z" "y"
-        }
+        output2 = VClosure [] "x" (Let "y" "x" $ Lambda "z" $ Apply "z" "y")
     evalExpr input2 `shouldBeM` output2
 
 applicationSpec :: Spec
@@ -108,17 +87,9 @@ applicationSpec = describe "function application" $ do
   it "should apply a nested lambda" $ do
     -- (λx -> λy -> x y) (λx -> x)
     let input = Apply apply idfunc
-        output = VClosure {
-          _cEnvironment = [
-            ("x", VClosure {
-              _cEnvironment = [],
-              _cPattern = "x",
-              _cBody = "x"
-            })
-          ],
-          _cPattern = "y",
-          _cBody = Apply "x" "y"
-        }
+        output = VClosure [("x", VClosure [] "x" "x")]
+                          "y"
+                          (Apply "x" "y")
     evalExpr input `shouldBeM` output
 
   it "should apply that function and act like the id function" $ do
@@ -193,8 +164,12 @@ caseSpec = describe "case statements" $ do
                           ("Nothing", Int 0)]
     evalExpr (case_ "Nothing") `shouldBeM` VInt 0
     evalExpr (case_ (Apply "Just" (Int 2))) `shouldBeM` VInt 3
-  it "should error if nothing matches" $
-    pendingWith "Don't know how to assert an error"
+
+  it "should error if nothing matches" $ do
+    let emptyCase = Case (Int 1) []
+    evalExpr emptyCase `shouldThrow` anyException
+    let noMatchCase = Case (Int 1) [(Int 2, Int 3)]
+    evalExpr emptyCase `shouldThrow` anyException
 
   let case_ pattern z = Case z [(pattern, binary "x" "+" "y")]
   it "should destructure nested patterns on the right" $ do
