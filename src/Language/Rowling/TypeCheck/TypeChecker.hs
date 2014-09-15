@@ -306,6 +306,12 @@ typeOfList typeOf exprs = do
 -- rather it gets added as a new variable to the scope.
 typeOfPattern :: Pattern -> TypeChecker (Type, Substitution)
 typeOfPattern pattern = case pattern of
+  -- Constant patterns are valid, and don't generate any bindings.
+  Int _ -> only "Int"
+  Float _ -> only "Float"
+  Constructor "True" -> only "Bool"
+  Constructor "False" -> only "Bool"
+  String _ -> only "String"
   -- With a variable, we assign it a fresh type.
   Variable name -> do var <- newvar
                       store name $ polytype var
@@ -320,8 +326,16 @@ typeOfPattern pattern = case pattern of
             (t, subs) <- lift $ typeOfPattern expr
             modify (subs •)
             return t
-  -- Constructed expressions are valid patterns (e.g. `&(Just x) -> x + 1`).
-  p@(Apply _ _) -> case unroll p of
+  -- Typed patterns let us assert that the pattern follows a particular type.
+  Typed expr t -> do (t', s) <- typeOfPattern expr `ifErrorDo` invalid
+                     s' <- unify t' t
+                     applyAndReturn t (s • s')
+  -- Lists can appear in patterns.
+  List patterns -> typeOfList typeOfPattern (toList patterns)
+  -- Any other valid pattern will be a constructed expression, built from
+  -- applying some constructor to 0 or more arguments. We can separate these
+  -- out by calling `unroll`.
+  _ -> case unroll pattern of
     (Constructor c, args) -> do
       let find = findOrError $ oneErrorC ["Unknown constructor ", tshow c]
       constructorT <- instantiate =<< find c
@@ -329,18 +343,7 @@ typeOfPattern pattern = case pattern of
       (argTs, argSubs) <- typesInList typeOfPattern args
       unifySubs <- unify constructorT (foldr (==>) constructedT argTs)
       applyAndReturn constructedT (argSubs • unifySubs)
-  -- Typed patterns let us assert that the pattern follows a particular type.
-  Typed expr t -> do (t', s) <- typeOfPattern expr `ifErrorDo` invalid
-                     s' <- unify t' t
-                     applyAndReturn t (s • s')
-  -- Constant patterns are valid, and don't generate any bindings.
-  Int _ -> only "Int"
-  Float _ -> only "Float"
-  Constructor "True" -> only "Bool"
-  Constructor "False" -> only "Bool"
-  String _ -> only "String"
-  -- Any other patterns are invalid.
-  _ -> invalid
+    _ -> invalid
   where invalid = throwErrorC ["Invalid pattern: ", render pattern]
 
 

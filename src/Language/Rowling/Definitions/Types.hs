@@ -121,7 +121,7 @@ instance FreeVars a => FreeVars (HashMap x a) where
 data Polytype = Polytype (Set Name) Type deriving (Show, Eq)
 
 instance IsString Polytype where
-  fromString = Polytype mempty . fromString
+  fromString = polytype . fromString
 
 -- | Stores names that we've typed.
 type TypeMap = HashMap Name Polytype
@@ -189,12 +189,16 @@ polytype = Polytype mempty
 tRecord :: [(Name, Type)] -> Type
 tRecord fields = TRecord (H.fromList fields) Nothing
 
+-- | Creates an extensible record type from a list of fields.
+tRecord' :: [(Name, Type)] -> Name -> Type
+tRecord' fields name = TRecord (H.fromList fields) (Just name)
+
 -- | Checks if the string is a number.
 isNumber :: Text -> Bool
 isNumber = T.all isDigit
 
 -- | Generates the next name in the "fresh name sequence". This sequence is:
--- `a, b, c, ..., z, za, zb, zc, ... zz, zza, zzb, zzc...`
+-- @a, b, c, ..., z, za, zb, zc, ... zz, zza, zzb, zzc...@
 next :: Text -> Text
 next name = case T.last name of
   c | c < 'z' -> T.init name `T.snoc` succ c

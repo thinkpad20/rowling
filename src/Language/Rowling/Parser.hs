@@ -27,7 +27,7 @@ type Parser = ParsecT String ParserState Identity
 -- | Set of keywords.
 keywords :: Set Text
 keywords = S.fromList ["if", "then", "else", "is", "true", "false",
-                       "let", "with"]
+                       "let", "with", "without"]
 
 -- | Set of reserved symbols.
 keysymbols :: Set Text

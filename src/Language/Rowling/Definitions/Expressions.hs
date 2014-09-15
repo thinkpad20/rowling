@@ -20,13 +20,13 @@ data Expr = Int Integer -- ^ An integer literal.
           | Constructor Name -- ^ A constructor (e.g. @Just@, @False@, etc).
           | Typed Expr Type -- ^ An expression with annotated type.
           | Lambda Name Expr -- ^ A lambda expression.
-          | Case Expr [(Pattern, Expr)] -- ^ A case statement.
           | Let Name Expr Expr -- ^ A let expression.
           | Apply Expr Expr -- ^ An application.
           | Dot Expr Name -- ^ A field dereference.
           | List (Vector Expr) -- ^ A list literal.
-          | Record (Record Expr) -- ^ A record literal.
           | If Expr Expr Expr -- ^ A conditional expression.
+          | Case Expr [(Pattern, Expr)] -- ^ A case statement.
+          | Record (Record Expr) -- ^ A record literal.
           deriving (Show, Eq)
 
 -- | Patterns are just expressions, although they're used differently.
@@ -117,11 +117,12 @@ unroll :: Expr -> (Expr, [Expr])
 unroll (Apply a b) = let (f, xs) = unroll a in (f, xs `snoc` b)
 unroll e = (e, [])
 
-
+-- | The free variables here are those in the interpolated expressions.
 instance FreeVars Interp where
   freevars (Interp i1 e i2) = freevars i1 <> freevars e <> freevars i2
   freevars _ = mempty
 
+-- | Collects variables; removes those bound by `Let` and `Lambda`.
 instance FreeVars Expr where
   freevars = \case
     Variable name -> S.singleton name
@@ -130,9 +131,10 @@ instance FreeVars Expr where
     Lambda name e -> S.delete name $ freevars e
     Case e alts -> freevars e <> freeAlts where
       freeAlts = concatMap (\(p, e) -> freevars e \\ freevars p) alts
-    Let name e1 e2 -> freevars e1 <> (S.delete name $ freevars e2)
+    Let name e1 e2 -> S.delete name $ freevars e1 <> freevars e2
     Apply e1 e2 -> freevars e1 <> freevars e2
     Dot e _ -> freevars e
     List es -> concatMap freevars es
     Record es -> concatMap freevars es
     If e1 e2 e3 -> freevars e1 <> freevars e2 <> freevars e3
+    _ -> mempty
