@@ -203,9 +203,9 @@ typeOf expr = go expr `catchError` whenTyping where
     Constructor "False" -> only "Bool"
     String _ -> only "String"
     Constructor c -> find >>= instantiate >>= only where
-      find = findOrError (ErrorList ["Unknown constructor ", tshow c]) c
+      find = findOrError (oneErrorC ["Unknown constructor ", tshow c]) c
     Variable name -> find name >>= instantiate >>= only where
-      find = findOrError $ ErrorList ["No variable '" <> name <> "' in scope"]
+      find = findOrError $ oneErrorC ["No variable '" <> name <> "' in scope"]
     Lambda name body -> withFrame mempty $ do
       paramT <- newvar
       store name $ polytype paramT
@@ -323,7 +323,7 @@ typeOfPattern pattern = case pattern of
   -- Constructed expressions are valid patterns (e.g. `&(Just x) -> x + 1`).
   p@(Apply _ _) -> case unroll p of
     (Constructor c, args) -> do
-      let find = findOrError $ ErrorList ["Unknown constructor ", tshow c]
+      let find = findOrError $ oneErrorC ["Unknown constructor ", tshow c]
       constructorT <- instantiate =<< find c
       constructedT <- newvar
       (argTs, argSubs) <- typesInList typeOfPattern args
@@ -432,7 +432,7 @@ typeIt = typeIt' typeOf
 typeIt' :: (Expr -> TypeChecker a)
         -> P.String -> (Either ErrorList a, TCState)
 typeIt' typer input = case parseIt input of
-  Left err -> (Left $ ErrorList [pack $ show err], def)
+  Left err -> (Left $ ErrorList (pack $ show err) [], def)
   Right expr -> runTypingWith def $ typer expr
 
 -- | Runs the type checker with an initial state.
@@ -455,5 +455,5 @@ pTypeIt :: P.String -> IO ()
 pTypeIt input = case parseIt input of
   Left err -> error $ show err
   Right expr -> case typeExprN expr of
-    Left (ErrorList errs) -> mapM_ print errs
-    Right type_ -> putStrLn $ render type_
+    Left errlist -> printErrors errlist
+    Right type_ -> putStrLn $ render expr <> " : " <> render type_
