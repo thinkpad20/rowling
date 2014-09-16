@@ -11,8 +11,7 @@ import Text.Parsec hiding (many, (<|>), spaces, parse)
 import qualified Text.Parsec as Parsec
 
 import Language.Rowling.Common hiding (try)
-import Language.Rowling.Definitions.Types
-import Language.Rowling.Definitions.Expressions
+import Language.Rowling.Definitions
 
 -- | The parser state, if any.
 type ParserState = ()

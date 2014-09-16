@@ -1,8 +1,7 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase, RecordWildCards,
-             FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE LambdaCase #-}
 module Language.Rowling.Evaluator.Evaluator where
 
 import qualified Prelude as P
@@ -13,8 +12,7 @@ import Data.String (IsString(..))
 import Data.ContextStack
 
 import Language.Rowling.Common
-import Language.Rowling.Definitions.Expressions
-import Language.Rowling.Definitions.Values
+import Language.Rowling.Definitions
 
 -- | Evaluates an expression into a value.
 eval :: Expr -> Eval Value

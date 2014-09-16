@@ -3,8 +3,7 @@ module Language.Rowling.Evaluator where
 
 import Prelude (String)
 import Language.Rowling.Common
-import Language.Rowling.Definitions.Expressions
-import Language.Rowling.Definitions.Values
+import Language.Rowling.Definitions
 import Language.Rowling.Evaluator.Evaluator
 import Language.Rowling.Evaluator.Builtins
 import Language.Rowling.Parser

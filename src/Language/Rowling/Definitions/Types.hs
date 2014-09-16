@@ -203,3 +203,6 @@ next :: Text -> Text
 next name = case T.last name of
   c | c < 'z' -> T.init name `T.snoc` succ c
     | True    -> name `T.snoc` 'a'
+
+listOf :: Type -> Type
+listOf = TApply "List"
