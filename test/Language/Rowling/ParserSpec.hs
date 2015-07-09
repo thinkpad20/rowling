@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Language.Rowling.ParserSpec (main, spec) where
 
 import SpecHelper

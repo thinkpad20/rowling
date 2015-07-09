@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Language.Rowling.EvaluatorSpec (main, spec) where
 
 import SpecHelper

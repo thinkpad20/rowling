@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings, LambdaCase, FlexibleInstances,
-             OverloadedLists, TypeSynonymInstances #-}
+             OverloadedLists, TypeSynonymInstances, 
+             FlexibleContexts #-}
 module Language.Rowling.Definitions.Types where
 
 import qualified Prelude as P
@@ -40,8 +41,11 @@ instance Render Type where
     TApply t1 t2 -> renderParens t1 <> " " <> renderParens t2
     TRecord row r -> "(" <> inside <> renderRest r <> ")" where
       inside = case splitRow row of
+        -- Only non-numeric keys
         ([], named) -> commas renderPair named
+        -- Only numeric keys
         (vals, []) -> commas render vals
+        -- Mixture of the two
         (vals, named) -> commas render vals <> ", " <> commas renderPair named
     where
       renderRest r = case r of
@@ -51,8 +55,10 @@ instance Render Type where
       renderPair (field, typ) = field <> ": " <> render typ
       -- | Splits a row into the fields which have numeric names (0, 1, ...)
       -- and the ones that have "normal" names.
+      splitRow :: HashMap Name Type -> ([Type], [(Name, Type)])
       splitRow row = (snd <$> nums', withNames) where
         (withNums, withNames) = L.partition (isNumber . fst) $ H.toList row
+        toNum :: (Name, Type) -> (Int, Type)
         toNum (name, t) = (P.read (unpack name) :: Int, t)
         nums' = L.sortBy (\(a, _) (b, _) -> compare a b) (map toNum withNums)
   renderParens t@(TApply _ _) = "(" <> render t <> ")"

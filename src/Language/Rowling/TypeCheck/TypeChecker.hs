@@ -48,7 +48,7 @@ instance Default TCState where
   }
 
 -- | The main type checking monad, containing the type checker state.
-type TypeChecker = ExceptT ErrorList (StateT TCState IO)
+type TypeChecker = ExceptT EList (StateT TCState IO)
 
 ------------------------------------------------------------------------------
 -- * Substitutions
@@ -398,24 +398,24 @@ deref t field = case t of
 ------------------------------------------------------------------------------
 
 -- | Runs the type checking monad with a default state.
-runTyping :: TypeChecker a -> Either ErrorList a
+runTyping :: TypeChecker a -> Either EList a
 runTyping = fst . runTypingWith def
 
 -- | Runs the type checking monad with a given state.
-runTypingWith :: TCState -> TypeChecker a -> (Either ErrorList a, TCState)
+runTypingWith :: TCState -> TypeChecker a -> (Either EList a, TCState)
 runTypingWith state action = do
   unsafePerformIO $ runStateT (runExceptT action) state
 
 -- | Get the type of an expression, or error.
-typeExpr :: Expr -> Either ErrorList Type
+typeExpr :: Expr -> Either EList Type
 typeExpr = typeWithBindings empty
 
 -- | Get the type of an expression, normalized, or error.
-typeExprN :: Expr -> Either ErrorList Type
+typeExprN :: Expr -> Either EList Type
 typeExprN = fmap normalize . typeExpr
 
 -- | Get the type of an expression with some environment, or error.
-typeWithBindings :: TypeMap -> Expr -> Either ErrorList Type
+typeWithBindings :: TypeMap -> Expr -> Either EList Type
 typeWithBindings bindings expr = do
   let state = def {_typeMaps = [bindings, builtInTypes]}
   case fst $ runTypingWith state $ typeOf expr of
@@ -424,29 +424,29 @@ typeWithBindings bindings expr = do
 
 -- | Get the type of an expression with some environment, normalized, or
 -- error.
-typeWithBindingsN :: TypeMap -> Expr -> Either ErrorList Type
+typeWithBindingsN :: TypeMap -> Expr -> Either EList Type
 typeWithBindingsN bindings = fmap normalize . typeWithBindings bindings
 
 -- | Parses a string and gets its type.
-typeIt :: P.String -> (Either ErrorList (Type, Substitution), TCState)
+typeIt :: P.String -> (Either EList (Type, Substitution), TCState)
 typeIt = typeIt' typeOf
 
 -- | Parses a string and runs it into an arbitrary typechecker function.
 typeIt' :: (Expr -> TypeChecker a)
-        -> P.String -> (Either ErrorList a, TCState)
+        -> P.String -> (Either EList a, TCState)
 typeIt' typer input = case parseIt input of
-  Left err -> (Left $ ErrorList (pack $ show err) [], def)
+  Left err -> (Left $ oneError (pack $ show err), def)
   Right expr -> runTypingWith def $ typer expr
 
 -- | Runs the type checker with an initial state.
-typeWith :: MonadError ErrorList m
+typeWith :: MonadError EList m
          => TCState -> Expr -> m (Type, TCState)
 typeWith state expr = case runTypingWith state (typeOf expr) of
   (Left el, _) -> throwError el
   (Right (t, subs), state') -> return (subs •> t, state')
 
 -- | Runs the type checker given type mappings and type aliases.
-typeWithContext :: (Functor m, MonadError ErrorList m)
+typeWithContext :: (Functor m, MonadError EList m)
                 => TypeMap -> AliasMap -> Expr -> m (Type, TypeMap)
 typeWithContext tmap amap expr = do
   let state = TCState {_count = 0, _typeMaps = [tmap], _typeAliases = amap}

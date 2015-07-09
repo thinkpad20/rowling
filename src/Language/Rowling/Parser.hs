@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings, OverloadedLists, LambdaCase #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Language.Rowling.Parser where
 
 import qualified Prelude as P
@@ -126,7 +128,7 @@ pString = String . Plain <$> pBasicString
 pBasicString :: Parser Text
 pBasicString = do
   start <- char '"' <|> char '\''
-  loop start []
+  loop start ([] :: [Char])
   where
     loop stop acc = do
       anyChar >>= \case

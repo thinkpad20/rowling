@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings, OverloadedLists #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Language.Rowling.TypeCheckerSpec (spec) where
 
 import SpecHelper
@@ -10,10 +12,10 @@ import Language.Rowling.Definitions.Types
 import Language.Rowling.TypeCheck.TypeChecker
 
 -- | Shorthand for a repeatedly used function
-twith :: TypeMap -> Expr -> Either ErrorList Type
+twith :: TypeMap -> Expr -> Either EList Type
 twith = typeWithBindingsN
 
-can'tUnify :: Either ErrorList Type -> IO ()
+can'tUnify :: Either EList Type -> IO ()
 can'tUnify x = x `shouldHaveErr` "Can't unify types"
 
 spec :: Spec

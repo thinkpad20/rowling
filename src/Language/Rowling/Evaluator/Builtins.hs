@@ -90,7 +90,7 @@ builtinEach = Builtin "each" $ \case
   where
     eachVals vals = bi "eachApplied" $ \func -> do
       let applyFunc val = case func of
-            VClosure{..} -> undefined
+            VClosure _ _ _ -> error "Can't handle closures here"
             VBuiltin (Builtin _ builtin) -> builtin val
       results <- mapM applyFunc vals
       return $ VArray results

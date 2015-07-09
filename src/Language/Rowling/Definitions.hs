@@ -1,4 +1,4 @@
-module Language.Rowling.Definitions (
+Vamodule Language.Rowling.Definitions (
     module Language.Rowling.Definitions.Types,
     module Language.Rowling.Definitions.Expressions,
     module Language.Rowling.Definitions.Values

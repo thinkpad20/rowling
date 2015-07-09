@@ -26,7 +26,7 @@ module Language.Rowling.Common (
     Name, Record, for, tuple
   ) where
 
-import ClassyPrelude hiding (assert, asList, find)
+import ClassyPrelude hiding (assert, asList, find, for, keys)
 import qualified Prelude as P
 import Control.Exception.ErrorList
 import Control.Monad (when)

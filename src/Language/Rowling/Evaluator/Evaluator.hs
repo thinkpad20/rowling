@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Language.Rowling.Evaluator.Evaluator where
 
 import qualified Prelude as P

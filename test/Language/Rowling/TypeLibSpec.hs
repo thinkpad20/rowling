@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings, OverloadedLists #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Language.Rowling.TypeLibSpec (spec) where
 
 import SpecHelper

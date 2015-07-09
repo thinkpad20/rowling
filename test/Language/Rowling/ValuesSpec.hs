@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Language.Rowling.ValuesSpec (main, spec) where
 
 import SpecHelper
